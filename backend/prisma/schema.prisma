@@ -1,0 +1,63 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Company {
+  id           String        @id @default(cuid())
+  name         String
+  email        String        @unique
+  timezone     String        @default("Europe/Vienna")
+  createdAt    DateTime      @default(now())
+
+  services     Service[]
+  appointments Appointment[]
+  availabilities Availability[]
+}
+
+model Service {
+  id              String        @id @default(cuid())
+  companyId       String
+  name            String
+  description     String?
+  durationMinutes Int
+  active          Boolean       @default(true)
+  createdAt       DateTime      @default(now())
+
+  company      Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  appointments Appointment[]
+}
+
+model Availability {
+  id        String @id @default(cuid())
+  companyId String
+  weekday   Int
+  startTime String
+  endTime   String
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, weekday])
+}
+
+model Appointment {
+  id            String   @id @default(cuid())
+  companyId     String
+  serviceId     String
+  customerName  String
+  customerEmail String
+  startTime     DateTime
+  endTime       DateTime
+  status        String   @default("CONFIRMED")
+  createdAt     DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  service Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, startTime])
+  @@index([serviceId, startTime])
+}

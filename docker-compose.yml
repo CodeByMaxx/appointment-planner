@@ -1,0 +1,28 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: appointment-planner-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: appointment_planner
+      POSTGRES_USER: appointment
+      POSTGRES_PASSWORD: appointment_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  api:
+    build:
+      context: ./backend
+    container_name: appointment-planner-api
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: "postgresql://appointment:appointment_dev@postgres:5432/appointment_planner"
+    ports:
+      - "3001:3001"
+    depends_on:
+      - postgres
+
+volumes:
+  postgres_data:
