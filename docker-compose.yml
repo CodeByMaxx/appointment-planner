@@ -19,10 +19,24 @@ services:
     restart: unless-stopped
     environment:
       DATABASE_URL: "postgresql://appointment:appointment_dev@postgres:5432/appointment_planner"
+      AWS_REGION: "eu-central-1" 
+      SES_FROM_EMAIL: "Markus.Gruber4@gmx.net"
     ports:
       - "3001:3001"
     depends_on:
       - postgres
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: "http://3.64.58.142:3001"
+    container_name: appointment-planner-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - api
 
 volumes:
   postgres_data:

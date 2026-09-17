@@ -1,3 +1,4 @@
+import API_URL from "../lib/api";
 import { useEffect, useState } from "react";
 
 type Availability = {
@@ -35,8 +36,8 @@ export default function AvailabilityList() {
 
   async function loadAvailability() {
     try {
-      const response = await fetch(
-        "http://localhost:3001/availability?companyId=1"
+      const response = await  fetch(
+        `${API_URL}/availability?companyId=1`
       );
 
       const data = await response.json();
@@ -81,9 +82,7 @@ export default function AvailabilityList() {
     }
 
     try {
-      const response = await fetch(
-        `http://localhost:3001/availability/${id}`,
-        {
+      const response = await fetch(`${API_URL}/availability/${id}`, {    
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
@@ -131,9 +130,7 @@ export default function AvailabilityList() {
     setSuccess("");
 
     try {
-      const response = await fetch(
-        `http://localhost:3001/availability/${id}`,
-        {
+      const response = await fetch(`${API_URL}/availability/${id}`, {  
           method: "DELETE",
         }
       );
@@ -178,9 +175,7 @@ export default function AvailabilityList() {
     }
 
     try {
-      const response = await fetch(
-        "http://localhost:3001/availability",
-        {
+      const response = await fetch(`${API_URL}/availability`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",

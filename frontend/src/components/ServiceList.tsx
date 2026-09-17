@@ -1,3 +1,4 @@
+import API_URL from "../lib/api";
 import { useEffect, useState } from "react";
 
 type Service = {
@@ -10,34 +11,30 @@ type Service = {
 };
 
 export default function ServiceList() {
-  const [services, setServices] =
-    useState<Service[]>([]);
-
+  const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [newName, setNewName] = useState("");
-  const [newDescription, setNewDescription] =
-    useState("");
-  const [newDuration, setNewDuration] =
-    useState("30");
+  const [newDescription, setNewDescription] = useState("");
+  const [newDuration, setNewDuration] = useState("30");
 
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
   async function loadServices() {
     setLoading(true);
+    setError("");
 
     try {
       const response = await fetch(
-        "http://localhost:3001/services?companyId=1"
+        `${API_URL}/services?companyId=1`
       );
 
       const data = await response.json();
 
       if (!response.ok) {
         throw new Error(
-          data.error ||
-            "Services konnten nicht geladen werden."
+          data.error || "Services konnten nicht geladen werden."
         );
       }
 
@@ -45,9 +42,7 @@ export default function ServiceList() {
     } catch (error) {
       console.error(error);
 
-      setError(
-        "Services konnten nicht geladen werden."
-      );
+      setError("Services konnten nicht geladen werden.");
     } finally {
       setLoading(false);
     }
@@ -73,15 +68,13 @@ export default function ServiceList() {
     }
 
     if (durationMinutes <= 0) {
-      setError(
-        "Die Dauer muss größer als 0 sein."
-      );
+      setError("Die Dauer muss größer als 0 sein.");
       return;
     }
 
     try {
       const response = await fetch(
-        `http://localhost:3001/services/${id}`,
+        `${API_URL}/services/${id}`,
         {
           method: "PUT",
           headers: {
@@ -89,8 +82,7 @@ export default function ServiceList() {
           },
           body: JSON.stringify({
             name: name.trim(),
-            description:
-              description.trim() || undefined,
+            description: description.trim() || undefined,
             durationMinutes,
             active,
           }),
@@ -101,8 +93,7 @@ export default function ServiceList() {
 
       if (!response.ok) {
         setError(
-          data.error ||
-            "Service konnte nicht geändert werden."
+          data.error || "Service konnte nicht geändert werden."
         );
         return;
       }
@@ -113,15 +104,11 @@ export default function ServiceList() {
         )
       );
 
-      setSuccess(
-        "Service wurde aktualisiert."
-      );
+      setSuccess("Service wurde aktualisiert.");
     } catch (error) {
       console.error(error);
 
-      setError(
-        "Der Server konnte nicht erreicht werden."
-      );
+      setError("Der Server konnte nicht erreicht werden.");
     }
   }
 
@@ -129,26 +116,21 @@ export default function ServiceList() {
     setError("");
     setSuccess("");
 
-    const duration =
-      Number(newDuration);
+    const duration = Number(newDuration);
 
     if (!newName.trim()) {
-      setError(
-        "Bitte geben Sie einen Namen ein."
-      );
+      setError("Bitte geben Sie einen Namen ein.");
       return;
     }
 
     if (duration <= 0) {
-      setError(
-        "Die Dauer muss größer als 0 sein."
-      );
+      setError("Die Dauer muss größer als 0 sein.");
       return;
     }
 
     try {
       const response = await fetch(
-        "http://localhost:3001/services",
+        `${API_URL}/services`,
         {
           method: "POST",
           headers: {
@@ -157,8 +139,7 @@ export default function ServiceList() {
           body: JSON.stringify({
             companyId: "1",
             name: newName.trim(),
-            description:
-              newDescription.trim() || undefined,
+            description: newDescription.trim() || undefined,
             durationMinutes: duration,
           }),
         }
@@ -168,16 +149,14 @@ export default function ServiceList() {
 
       if (!response.ok) {
         setError(
-          data.error ||
-            "Service konnte nicht erstellt werden."
+          data.error || "Service konnte nicht erstellt werden."
         );
         return;
       }
 
       setServices((current) =>
-        [...current, data].sort(
-          (a, b) =>
-            a.name.localeCompare(b.name)
+        [...current, data].sort((a, b) =>
+          a.name.localeCompare(b.name)
         )
       );
 
@@ -185,27 +164,21 @@ export default function ServiceList() {
       setNewDescription("");
       setNewDuration("30");
 
-      setSuccess(
-        "Service wurde erstellt."
-      );
+      setSuccess("Service wurde erstellt.");
     } catch (error) {
       console.error(error);
 
-      setError(
-        "Der Server konnte nicht erreicht werden."
-      );
+      setError("Der Server konnte nicht erreicht werden.");
     }
   }
 
-  async function deactivateService(
-    id: string
-  ) {
+  async function deactivateService(id: string) {
     setError("");
     setSuccess("");
 
     try {
       const response = await fetch(
-        `http://localhost:3001/services/${id}`,
+        `${API_URL}/services/${id}`,
         {
           method: "DELETE",
         }
@@ -215,8 +188,7 @@ export default function ServiceList() {
 
       if (!response.ok) {
         setError(
-          data.error ||
-            "Service konnte nicht deaktiviert werden."
+          data.error || "Service konnte nicht deaktiviert werden."
         );
         return;
       }
@@ -232,15 +204,11 @@ export default function ServiceList() {
         )
       );
 
-      setSuccess(
-        "Service wurde deaktiviert."
-      );
+      setSuccess("Service wurde deaktiviert.");
     } catch (error) {
       console.error(error);
 
-      setError(
-        "Der Server konnte nicht erreicht werden."
-      );
+      setError("Der Server konnte nicht erreicht werden.");
     }
   }
 
@@ -290,9 +258,7 @@ export default function ServiceList() {
             key={service.id}
             service={service}
             onUpdate={updateService}
-            onDeactivate={
-              deactivateService
-            }
+            onDeactivate={deactivateService}
           />
         ))}
       </div>
@@ -307,9 +273,7 @@ export default function ServiceList() {
             type="text"
             value={newName}
             onChange={(event) =>
-              setNewName(
-                event.target.value
-              )
+              setNewName(event.target.value)
             }
             placeholder="z. B. Bart schneiden"
           />
@@ -322,9 +286,7 @@ export default function ServiceList() {
             type="text"
             value={newDescription}
             onChange={(event) =>
-              setNewDescription(
-                event.target.value
-              )
+              setNewDescription(event.target.value)
             }
             placeholder="Beschreibung"
           />
@@ -338,9 +300,7 @@ export default function ServiceList() {
             min="1"
             value={newDuration}
             onChange={(event) =>
-              setNewDuration(
-                event.target.value
-              )
+              setNewDuration(event.target.value)
             }
           />
         </div>
@@ -373,16 +333,15 @@ function ServiceRow({
   onUpdate,
   onDeactivate,
 }: ServiceRowProps) {
-  const [name, setName] =
-    useState(service.name);
+  const [name, setName] = useState(service.name);
 
-  const [description, setDescription] =
-    useState(service.description || "");
+  const [description, setDescription] = useState(
+    service.description || ""
+  );
 
-  const [duration, setDuration] =
-    useState(
-      String(service.durationMinutes)
-    );
+  const [duration, setDuration] = useState(
+    String(service.durationMinutes)
+  );
 
   return (
     <div
@@ -405,9 +364,7 @@ function ServiceRow({
           type="text"
           value={description}
           onChange={(event) =>
-            setDescription(
-              event.target.value
-            )
+            setDescription(event.target.value)
           }
         />
       </div>
@@ -423,9 +380,7 @@ function ServiceRow({
       />
 
       <span className="service-status">
-        {service.active
-          ? "Aktiv"
-          : "Inaktiv"}
+        {service.active ? "Aktiv" : "Inaktiv"}
       </span>
 
       <button

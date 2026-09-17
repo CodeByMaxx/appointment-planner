@@ -1,3 +1,4 @@
+import API_URL from "../lib/api";
 import { useEffect, useState } from "react";
 
 type Service = {
@@ -38,7 +39,7 @@ export default function BookingPage() {
   const [bookingError, setBookingError] = useState("");
 
   useEffect(() => {
-    fetch("http://localhost:3001/services?companyId=1")
+    fetch(`${API_URL}/services?companyId=1`)
       .then((response) => response.json())
       .then((data) => setServices(data))
       .catch((error) => {
@@ -62,7 +63,7 @@ export default function BookingPage() {
     setBookingError("");
 
     fetch(
-      `http://localhost:3001/slots?companyId=1&serviceId=${selectedService}&date=${selectedDate}`
+      `${API_URL}/slots?companyId=1&serviceId=${selectedService}&date=${selectedDate}`
     )
       .then((response) => response.json())
       .then((data) => setSlots(data))
@@ -101,7 +102,7 @@ export default function BookingPage() {
 
     try {
       const response = await fetch(
-        "http://localhost:3001/appointments",
+        `${API_URL}/appointments`,
         {
           method: "POST",
           headers: {
@@ -134,7 +135,7 @@ export default function BookingPage() {
       setCustomerEmail("");
 
       const slotsResponse = await fetch(
-        `http://localhost:3001/slots?companyId=1&serviceId=${selectedService}&date=${selectedDate}`
+        `${API_URL}/slots?companyId=1&serviceId=${selectedService}&date=${selectedDate}`
       );
 
       const updatedSlots = await slotsResponse.json();
@@ -156,6 +157,7 @@ export default function BookingPage() {
       <div className="page-header">
         <div>
           <h2>Termin buchen</h2>
+
           <p>
             Wählen Sie eine Dienstleistung,
             einen Tag und eine verfügbare Uhrzeit.
@@ -208,9 +210,7 @@ export default function BookingPage() {
                 type="date"
                 value={selectedDate}
                 onChange={(event) =>
-                  setSelectedDate(
-                    event.target.value
-                  )
+                  setSelectedDate(event.target.value)
                 }
               />
             </div>
@@ -236,9 +236,7 @@ export default function BookingPage() {
                     id="time"
                     value={selectedTime}
                     onChange={(event) => {
-                      setSelectedTime(
-                        event.target.value
-                      );
+                      setSelectedTime(event.target.value);
                       setBookingSuccess(false);
                       setBookingError("");
                     }}
@@ -247,22 +245,15 @@ export default function BookingPage() {
                       Bitte auswählen
                     </option>
 
-                    {availableSlots.map(
-                      (slot) => (
-                        <option
-                          key={slot.startTime}
-                          value={slot.startTime}
-                        >
-                          {formatTime(
-                            slot.startTime
-                          )}{" "}
-                          –{" "}
-                          {formatTime(
-                            slot.endTime
-                          )}
-                        </option>
-                      )
-                    )}
+                    {availableSlots.map((slot) => (
+                      <option
+                        key={slot.startTime}
+                        value={slot.startTime}
+                      >
+                        {formatTime(slot.startTime)} –{" "}
+                        {formatTime(slot.endTime)}
+                      </option>
+                    ))}
                   </select>
                 )}
               </div>
@@ -282,9 +273,7 @@ export default function BookingPage() {
                     type="text"
                     value={customerName}
                     onChange={(event) =>
-                      setCustomerName(
-                        event.target.value
-                      )
+                      setCustomerName(event.target.value)
                     }
                     placeholder="Max Mustermann"
                   />
@@ -300,9 +289,7 @@ export default function BookingPage() {
                     type="email"
                     value={customerEmail}
                     onChange={(event) =>
-                      setCustomerEmail(
-                        event.target.value
-                      )
+                      setCustomerEmail(event.target.value)
                     }
                     placeholder="max@example.com"
                   />

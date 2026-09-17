@@ -1,5 +1,6 @@
 import { FastifyInstance } from "fastify";
 import prisma from "../lib/prisma";
+import { sendAppointmentEmails } from "../lib/email";
 
 function getLocalParts(date: Date, timeZone: string) {
   const formatter = new Intl.DateTimeFormat("en-US", {
@@ -187,6 +188,38 @@ export default async function appointmentsRoutes(app: FastifyInstance) {
         status: "CONFIRMED",
       },
     });
+
+    // E-Mails nach erfolgreicher Buchung senden.
+    // Ein Fehler beim E-Mail-Versand soll die Buchung nicht rückgängig machen.
+    try {
+      await sendAppointmentEmails({
+        customerName: appointment.customerName,
+        customerEmail: appointment.customerEmail,
+        companyName: company.name,
+        companyEmail: company.email,
+        companyTimezone: company.timezone,
+        serviceName: service.name,
+        startTime: appointment.startTime,
+        endTime: appointment.endTime,
+      });
+
+      app.log.info(
+        {
+          appointmentId: appointment.id,
+          customerEmail: appointment.customerEmail,
+          companyEmail: company.email,
+        },
+        "Appointment emails sent"
+      );
+    } catch (error) {
+      app.log.error(
+        {
+          appointmentId: appointment.id,
+          error,
+        },
+        "Appointment created, but email notification failed"
+      );
+    }
 
     return reply.status(201).send(appointment);
   });

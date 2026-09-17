@@ -1,3 +1,4 @@
+import API_URL from "../lib/api";
 import { useEffect, useState } from "react";
 
 type Service = {
@@ -52,7 +53,7 @@ export default function AppointmentList() {
 
     try {
       const response = await fetch(
-        "http://localhost:3001/appointments?companyId=1"
+        `${API_URL}/appointments?companyId=1`
       );
 
       const data = await response.json();
@@ -81,9 +82,7 @@ export default function AppointmentList() {
     }
 
     try {
-      const response = await fetch(
-        `http://localhost:3001/appointments/${id}/cancel`,
-        {
+      const response = await fetch(`${API_URL}/appointments/${id}/cancel`, { 
           method: "PATCH",
         }
       );
