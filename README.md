@@ -14,19 +14,19 @@ The current version is a working MVP deployed on AWS EC2.
 
 ### Login
 
-![Login](docs/screenshots/login.png)
+![Login](./docs/screenshots/login.png)
 
 ### Appointment Booking
 
-![Booking](docs/screenshots/booking.png)
+![Booking](./docs/screenshots/booking.png)
 
 ### Dashboard
 
-![Dashboard](docs/screenshots/dashboard.png)
+![Dashboard](./docs/screenshots/dashboard.png)
 
 ### Appointments
 
-![Appointments](docs/screenshots/appointments.png)
+![Appointments](./docs/screenshots/appointments.png)
 
 ---
 
