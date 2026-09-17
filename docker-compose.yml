@@ -7,8 +7,6 @@ services:
       POSTGRES_DB: "${POSTGRES_DB}"
       POSTGRES_USER: "${POSTGRES_USER}"
       POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
-    ports:
-      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
@@ -21,10 +19,10 @@ services:
       DATABASE_URL: "${DATABASE_URL}"
       AWS_REGION: "${AWS_REGION}"
       SES_FROM_EMAIL: "${SES_FROM_EMAIL}"
-    ports:
-      - "3001:3001"
     depends_on:
       - postgres
+    ports:
+      - "3001:3001"
 
   frontend:
     build:
@@ -34,10 +32,10 @@ services:
         VITE_ADMIN_PASSWORD: "${VITE_ADMIN_PASSWORD}"
     container_name: appointment-planner-frontend
     restart: unless-stopped
-    ports:
-      - "80:80"
     depends_on:
       - api
+    ports:
+      - "80:80"
 
 volumes:
   postgres_data:
