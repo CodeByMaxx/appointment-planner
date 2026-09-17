@@ -1,435 +1,190 @@
 # Appointment Planner
 
-A containerized appointment booking application built as an AWS portfolio project.
+A containerized appointment booking application designed for small businesses and service providers.
 
-The application provides a complete appointment workflow for small businesses: customers can book available appointments, while operators can manage services, opening hours and appointments through a dashboard.
+The application allows customers to book available appointments online while providing operators with a dashboard for managing services, availability and appointments.
 
-The current version is a working MVP deployed on AWS EC2.
+This repository contains the public project documentation and showcase material. The application source code is maintained separately.
 
----
+## Overview
+
+The Appointment Planner is a full-stack web application built with a React frontend, a Fastify API and PostgreSQL.
+
+The application is designed around a simple booking workflow:
+
+1. Select a service
+2. Select a date
+3. Select an available time slot
+4. Enter customer details
+5. Confirm the appointment
+
+Operators can manage the application through a dedicated dashboard.
 
 ## Screenshots
 
-> Screenshots will be added here.
-
-### Login
-
-![Login](./docs/screenshots/login.png)
-
-### Appointment Booking
-
-![Booking](./docs/screenshots/booking.png)
-
-### Dashboard
-
-![Dashboard](./docs/screenshots/dashboard.png)
-
-### Appointments
-
-![Appointments](./docs/screenshots/appointments.png)
-
----
+<table>
+  <tr>
+    <td align="center">
+      <img src="./screenshots/login.png" alt="Login" width="400">
+      <br>
+      <b>Login</b>
+    </td>
+    <td align="center">
+      <img src="./screenshots/booking.png" alt="Booking" width="400">
+      <br>
+      <b>Booking</b>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="./screenshots/dashboard.png" alt="Dashboard" width="400">
+      <br>
+      <b>Dashboard</b>
+    </td>
+    <td align="center">
+      <img src="./screenshots/appointments.png" alt="Appointments" width="400">
+      <br>
+      <b>Appointments</b>
+    </td>
+  </tr>
+</table>
 
 ## Features
 
 ### Customer Booking
 
-Customers can:
-
-* Select a service
-* Select a date
-* View available time slots
-* Enter their name and email address
-* Confirm an appointment
-
-The booking system checks:
-
-* Service availability
-* Opening hours
-* Existing appointments
-* Appointment overlaps
-* Service duration
-* Company timezone
+* Service selection
+* Date selection
+* Available appointment slots
+* Customer name and email
+* Booking confirmation
+* Email confirmation after successful booking
 
 ### Operator Dashboard
 
-The dashboard allows operators to manage:
-
-* Appointments
-* Services
-* Opening hours
-* Appointment cancellations
-
-### Email Notifications
-
-After a successful booking, the application sends:
-
-* Confirmation email to the customer
-* Notification email to the company
-
-Email delivery is handled through AWS SES.
-
-The emails contain dynamically generated appointment information such as:
-
-* Customer
-* Service
-* Date
-* Time
-* Company
-
----
-
-## Architecture
-
-The current application runs as three Docker containers:
-
-```text
-                         Browser
-                            │
-                            ▼
-                   ┌─────────────────┐
-                   │ React Frontend  │
-                   │     Docker      │
-                   └────────┬────────┘
-                            │ REST API
-                            ▼
-                   ┌─────────────────┐
-                   │ Fastify Backend │
-                   │     Docker      │
-                   └───────┬───┬─────┘
-                           │   │
-                ┌──────────┘   └─────────────┐
-                ▼                            ▼
-       ┌─────────────────┐          ┌─────────────────┐
-       │   PostgreSQL    │          │     AWS SES     │
-       │     Docker      │          │     Email       │
-       └─────────────────┘          └─────────────────┘
-```
-
-### AWS Deployment
-
-```text
-                         AWS
-                          │
-                          ▼
-                    ┌────────────┐
-                    │    EC2     │
-                    │            │
-                    │  Docker    │
-                    │  Compose   │
-                    └─────┬──────┘
-                          │
-              ┌───────────┼───────────┐
-              │           │           │
-              ▼           ▼           ▼
-          Frontend       API      PostgreSQL
-                          │
-                          ▼
-                       AWS SES
-```
-
-The EC2 instance uses an IAM role to access AWS services. AWS access keys are not stored inside the application.
-
----
-
-## Technology Stack
-
-### Frontend
-
-* React
-* TypeScript
-* Vite
-* CSS
+* View appointments
+* Manage services
+* Configure availability
+* Cancel appointments
+* Receive booking notifications
 
 ### Backend
 
-* Node.js
-* TypeScript
-* Fastify
-* Prisma
+* REST API
+* PostgreSQL persistence
+* Prisma ORM
+* Timezone-aware appointment handling
+* AWS SES email integration
 
-### Database
+## Technology Stack
 
-* PostgreSQL 16
+| Area             | Technology                   |
+| ---------------- | ---------------------------- |
+| Frontend         | React, TypeScript, Vite      |
+| Backend          | Node.js, TypeScript, Fastify |
+| Database         | PostgreSQL                   |
+| ORM              | Prisma                       |
+| Email            | AWS SES                      |
+| Containerization | Docker, Docker Compose       |
+| Cloud            | AWS EC2, IAM                 |
+| AWS Region       | eu-central-1                 |
 
-### AWS
+## Architecture
+
+The application follows a containerized architecture with separate frontend, backend and database components.
+
+```text
+                    ┌──────────────────┐
+                    │     Customer     │
+                    │     Browser      │
+                    └────────┬─────────┘
+                             │
+                             ▼
+                    ┌──────────────────┐
+                    │     Frontend     │
+                    │ React / Vite     │
+                    └────────┬─────────┘
+                             │
+                             ▼
+                    ┌──────────────────┐
+                    │       API        │
+                    │ Fastify / Node   │
+                    └───────┬───┬──────┘
+                            │   │
+                    ┌───────┘   └──────────────┐
+                    ▼                          ▼
+             ┌──────────────┐           ┌──────────────┐
+             │ PostgreSQL   │           │   AWS SES    │
+             │   Database   │           │    Email     │
+             └──────────────┘           └──────────────┘
+```
+
+## AWS Deployment
+
+The current MVP is deployed to AWS using a containerized EC2 environment.
+
+The deployment demonstrates:
 
 * Amazon EC2
-* AWS IAM
-* Amazon SES
-
-### Infrastructure
-
-* Docker
-* Docker Compose
-
-### Development
-
-* Git
-* GitHub
-* Linux
-* npm
-
----
-
-## Project Structure
-
-```text
-appointment-planner/
-│
-├── backend/
-│   ├── prisma/
-│   │   ├── migrations/
-│   │   ├── schema.prisma
-│   │   └── seed.ts
-│   │
-│   ├── src/
-│   │   ├── lib/
-│   │   ├── routes/
-│   │   └── server.ts
-│   │
-│   ├── Dockerfile
-│   └── package.json
-│
-├── frontend/
-│   ├── src/
-│   │   ├── components/
-│   │   ├── pages/
-│   │   ├── lib/
-│   │   └── App.tsx
-│   │
-│   ├── Dockerfile
-│   └── package.json
-│
-├── docs/
-│   └── screenshots/
-│
-├── docker-compose.yml
-├── .gitignore
-└── README.md
-```
-
----
-
-## Database Model
-
-The main domain entities are:
-
-```text
-Company
-   │
-   ├── Services
-   │
-   ├── Availability
-   │
-   └── Appointments
-          │
-          └── Service
-```
-
-Appointments are stored in PostgreSQL using Prisma ORM.
-
-The application stores appointment timestamps in a timezone-aware manner and converts them for the company's configured timezone.
-
----
-
-## Local Development
-
-Clone the repository:
-
-```bash
-git clone https://github.com/CodeByMaxx/appointment-planner.git
-cd appointment-planner
-```
-
-Start the complete application:
-
-```bash
-docker compose up -d --build
-```
-
-The application provides:
-
-```text
-Frontend    http://localhost
-API         http://localhost:3001
-PostgreSQL  localhost:5432
-```
-
-Check the API:
-
-```bash
-curl http://localhost:3001/health
-```
-
-Expected response:
-
-```json
-{
-  "status": "ok",
-  "service": "appointment-planner-api"
-}
-```
-
----
-
-## Database Migrations
-
-Prisma is used for database schema management.
-
-Apply migrations with:
-
-```bash
-docker compose exec api npx prisma migrate deploy
-```
-
----
-
-## Current MVP Status
-
-The following functionality is currently implemented:
-
-* [x] React frontend
-* [x] Fastify REST API
-* [x] PostgreSQL database
-* [x] Prisma ORM
-* [x] Service management
-* [x] Opening hours management
-* [x] Availability calculation
-* [x] Timezone-aware slot generation
-* [x] Appointment creation
-* [x] Appointment cancellation
-* [x] Operator dashboard
-* [x] Administrator login
-* [x] AWS EC2 deployment
-* [x] Docker Compose deployment
-* [x] AWS SES integration
-* [x] Customer confirmation emails
-* [x] Company notification emails
-
----
-
-## Security
-
-The current version is an MVP and contains intentionally simplified authentication and infrastructure configuration.
-
-The following areas are planned for hardening:
-
-* Server-side authentication
-* HTTPS
-* Restricted security groups
-* Removal of publicly exposed database ports
-* Secure configuration management
-* Improved secret management
-* Application monitoring
-
-AWS credentials are not stored in the application. The EC2 instance uses an IAM role for AWS service access.
-
----
-
-## Deployment Model
-
-The application is designed around isolated customer environments.
-
-The intended deployment model is:
-
-```text
-Customer A
-    │
-    ▼
-AWS Environment A
-    │
-    └── Appointment Planner
-
-Customer B
-    │
-    ▼
-AWS Environment B
-    │
-    └── Appointment Planner
-```
-
-Each customer can therefore have an independently deployed application environment and database.
-
-The current implementation uses EC2 and Docker Compose as a simple deployment model.
-
----
-
-## Roadmap
-
-### Infrastructure
-
-* [ ] Remove dependency on fixed EC2 IP addresses
-* [ ] Centralize deployment configuration
-* [ ] Make deployments reproducible
-* [ ] Add HTTPS and custom domain
-* [ ] Improve AWS security configuration
-* [ ] Move PostgreSQL to Amazon RDS
-* [ ] Evaluate ECS/Fargate
-* [ ] Add monitoring and logging
-
-### Application
-
-* [ ] Production-ready authentication
-* [ ] Appointment rescheduling
-* [ ] Improved validation and error handling
-* [ ] Automated tests
-* [ ] Improved dashboard
-* [ ] Better administration features
-
-### Service Architecture
-
-The long-term goal is to evolve the application into independently deployable services.
-
-Potential future services include:
-
-```text
-                  Appointment Service
-                          │
-             ┌────────────┼────────────┐
-             ▼            ▼            ▼
-       Notification    Billing       CRM
-         Service       Service      Service
-             │
-             ▼
-       Invoice Service
-             │
-             ▼
-       Accounting Service
-```
-
-Additional services such as reporting and an AI-based assistant may be added later.
-
-The services should communicate through clearly defined APIs and, where appropriate, asynchronous messaging.
-
----
-
-## Portfolio Goals
-
-This project demonstrates practical experience with:
-
-* AWS infrastructure
-* Docker containerization
-* REST API development
-* React and TypeScript
-* PostgreSQL
-* Prisma ORM
+* Docker and Docker Compose
 * IAM roles
-* AWS SES
+* Amazon SES
+* PostgreSQL
+* AWS regional deployment
+
+The current architecture is intentionally kept simple for the MVP. Future iterations can move individual components toward managed AWS services such as ECS/Fargate and Amazon RDS.
+
+## Project Goals
+
+The project was built to explore and demonstrate practical experience with:
+
+* Full-stack application development
+* REST API design
+* Relational database design
+* Containerization
+* AWS infrastructure
 * Cloud deployment
-* Database design
+* IAM permissions
+* Transactional email
 * Timezone-aware business logic
 * Service-oriented architecture
 
-The project is intentionally being developed from a working MVP toward a more production-oriented cloud architecture.
+## Future Improvements
 
----
+Planned improvements include:
 
-## Repository
+* HTTPS and custom domain
+* Server-side authentication and authorization
+* Improved security hardening
+* Managed PostgreSQL using Amazon RDS
+* Container deployment using ECS/Fargate
+* CI/CD automation
+* Improved monitoring and logging
+* Improved appointment conflict handling
+* Production-ready service architecture
 
-This repository is used as the public portfolio and documentation repository.
+## Portfolio Context
 
-The application source code is maintained separately during development.
+The Appointment Planner is part of a broader portfolio of cloud-based software projects.
 
-**Status:** Working MVP deployed on AWS
+The long-term architecture is designed around independently deployable business services such as:
+
+* Appointment
+* Notification
+* Billing
+* Invoice
+* Accounting
+* CRM
+* Reporting
+* AI-assisted services
+
+The projects are designed to demonstrate practical software engineering and cloud architecture rather than a single monolithic application.
+
+## Source Code
+
+The application source code is maintained separately from this public portfolio repository.
+
+This directory contains only publicly shareable documentation, screenshots, architecture information and project material.
+
+No credentials, secrets, private keys, customer data or other confidential information are included.
 

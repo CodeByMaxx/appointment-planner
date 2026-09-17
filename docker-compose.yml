@@ -4,9 +4,9 @@ services:
     container_name: appointment-planner-db
     restart: unless-stopped
     environment:
-      POSTGRES_DB: appointment_planner
-      POSTGRES_USER: appointment
-      POSTGRES_PASSWORD: appointment_dev
+      POSTGRES_DB: "${POSTGRES_DB}"
+      POSTGRES_USER: "${POSTGRES_USER}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
     ports:
       - "5432:5432"
     volumes:
@@ -18,9 +18,9 @@ services:
     container_name: appointment-planner-api
     restart: unless-stopped
     environment:
-      DATABASE_URL: "postgresql://appointment:appointment_dev@postgres:5432/appointment_planner"
-      AWS_REGION: "eu-central-1" 
-      SES_FROM_EMAIL: "Markus.Gruber4@gmx.net"
+      DATABASE_URL: "${DATABASE_URL}"
+      AWS_REGION: "${AWS_REGION}"
+      SES_FROM_EMAIL: "${SES_FROM_EMAIL}"
     ports:
       - "3001:3001"
     depends_on:
@@ -30,7 +30,8 @@ services:
     build:
       context: ./frontend
       args:
-        VITE_API_URL: "http://3.64.58.142:3001"
+        VITE_API_URL: "${API_BASE_URL}"
+        VITE_ADMIN_PASSWORD: "${VITE_ADMIN_PASSWORD}"
     container_name: appointment-planner-frontend
     restart: unless-stopped
     ports:
