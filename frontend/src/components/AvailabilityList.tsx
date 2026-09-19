@@ -1,6 +1,8 @@
 import API_URL from "../lib/api";
 import { useEffect, useState } from "react";
 
+const COMPANY_ID = import.meta.env.VITE_COMPANY_ID;
+
 type Availability = {
   id: string;
   companyId: string;
@@ -37,7 +39,7 @@ export default function AvailabilityList() {
   async function loadAvailability() {
     try {
       const response = await  fetch(
-        `${API_URL}/availability?companyId=1`
+        `${API_URL}/availability?companyId=${COMPANY_ID}`
       );
 
       const data = await response.json();
@@ -181,7 +183,7 @@ export default function AvailabilityList() {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            companyId: "1",
+            companyId: COMPANY_ID,
             weekday: newWeekday,
             startTime: newStartTime,
             endTime: newEndTime,

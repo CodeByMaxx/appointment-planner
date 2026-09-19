@@ -1,6 +1,8 @@
 import API_URL from "../lib/api";
 import { useEffect, useState } from "react";
 
+const COMPANY_ID = import.meta.env.VITE_COMPANY_ID;
+
 type Service = {
   id: string;
   name: string;
@@ -39,7 +41,7 @@ export default function BookingPage() {
   const [bookingError, setBookingError] = useState("");
 
   useEffect(() => {
-    fetch(`${API_URL}/services?companyId=1`)
+    fetch(`${API_URL}/services?companyId=${COMPANY_ID}`)
       .then((response) => response.json())
       .then((data) => setServices(data))
       .catch((error) => {
@@ -63,7 +65,7 @@ export default function BookingPage() {
     setBookingError("");
 
     fetch(
-      `${API_URL}/slots?companyId=1&serviceId=${selectedService}&date=${selectedDate}`
+      `${API_URL}/slots?companyId=${COMPANY_ID}&serviceId=${selectedService}&date=${selectedDate}`
     )
       .then((response) => response.json())
       .then((data) => setSlots(data))
@@ -109,7 +111,7 @@ export default function BookingPage() {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            companyId: "1",
+            companyId: COMPANY_ID,
             serviceId: selectedService,
             customerName: customerName.trim(),
             customerEmail: customerEmail.trim(),
@@ -135,7 +137,7 @@ export default function BookingPage() {
       setCustomerEmail("");
 
       const slotsResponse = await fetch(
-        `${API_URL}/slots?companyId=1&serviceId=${selectedService}&date=${selectedDate}`
+        `${API_URL}/slots?companyId=${COMPANY_ID}&serviceId=${selectedService}&date=${selectedDate}`
       );
 
       const updatedSlots = await slotsResponse.json();

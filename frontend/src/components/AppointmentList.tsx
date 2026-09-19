@@ -1,6 +1,8 @@
 import API_URL from "../lib/api";
 import { useEffect, useState } from "react";
 
+const COMPANY_ID = import.meta.env.VITE_COMPANY_ID;
+
 type Service = {
   id: string;
   name: string;
@@ -53,7 +55,7 @@ export default function AppointmentList() {
 
     try {
       const response = await fetch(
-        `${API_URL}/appointments?companyId=1`
+        `${API_URL}/appointments?companyId=${COMPANY_ID}`
       );
 
       const data = await response.json();

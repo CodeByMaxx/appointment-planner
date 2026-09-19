@@ -1,6 +1,8 @@
 import API_URL from "../lib/api";
 import { useEffect, useState } from "react";
 
+const COMPANY_ID = import.meta.env.VITE_COMPANY_ID;
+
 type Service = {
   id: string;
   companyId: string;
@@ -27,7 +29,7 @@ export default function ServiceList() {
 
     try {
       const response = await fetch(
-        `${API_URL}/services?companyId=1`
+        `${API_URL}/services?companyId=${COMPANY_ID}`
       );
 
       const data = await response.json();
@@ -137,7 +139,7 @@ export default function ServiceList() {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            companyId: "1",
+            companyId: COMPANY_ID,
             name: newName.trim(),
             description: newDescription.trim() || undefined,
             durationMinutes: duration,

@@ -8,3 +8,5 @@ coverage/
 aws-seed.sql
 
 !.env.example
+
+deploy/customers/
