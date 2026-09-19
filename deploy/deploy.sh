@@ -55,7 +55,7 @@ REMOTE_PROJECT="/home/ec2-user/appointment-planner"
 API_PORT="3001"
 HTTP_PORT="80"
 
-COMPANY_ID="demo-company"
+COMPANY_ID=""
 
 POSTGRES_DB="appointment_planner"
 POSTGRES_USER="appointment"
@@ -94,6 +94,9 @@ done
 
 NAME=""
 ADMIN_PASSWORD=""
+COMPANY_NAME=""
+COMPANY_EMAIL=""
+COMPANY_TIMEZONE=""
 SENDER_EMAIL=""
 
 while IFS='=' read -r key value; do
@@ -101,6 +104,10 @@ while IFS='=' read -r key value; do
     NAME)
       NAME="$value"
       ;;
+    COMPANY_ID) COMPANY_ID="$value" ;;
+    COMPANY_NAME) COMPANY_NAME="$value" ;;
+    COMPANY_EMAIL) COMPANY_EMAIL="$value" ;;
+    COMPANY_TIMEZONE) COMPANY_TIMEZONE="$value" ;;
     ADMIN_PASSWORD)
       ADMIN_PASSWORD="$value"
       ;;
@@ -110,8 +117,12 @@ while IFS='=' read -r key value; do
   esac
 done < "$CUSTOMER_FILE"
 
-: "${NAME:?NAME is missing in $CUSTOMER_FILE}"
+: "${COMPANY_NAME:?COMPANY_NAME is missing in $CUSTOMER_FILE}"
 : "${ADMIN_PASSWORD:?ADMIN_PASSWORD is missing in $CUSTOMER_FILE}"
+: "${COMPANY_ID:?COMPANY_ID is missing in $CUSTOMER_FILE}"
+: "${COMPANY_NAME:?COMPANY_NAME is missing in $CUSTOMER_FILE}"
+: "${COMPANY_EMAIL:?COMPANY_EMAIL is missing in $CUSTOMER_FILE}"
+: "${COMPANY_TIMEZONE:?COMPANY_TIMEZONE is missing in $CUSTOMER_FILE}"
 : "${SENDER_EMAIL:?SENDER_EMAIL is missing in $CUSTOMER_FILE}"
 
 # ------------------------------------------------------------
@@ -364,6 +375,10 @@ AWS_REGION=${AWS_REGION}
 SES_FROM_EMAIL=${SENDER_EMAIL}
 
 VITE_ADMIN_PASSWORD=${ADMIN_PASSWORD}
+COMPANY_ID=${COMPANY_ID}
+COMPANY_NAME=${COMPANY_NAME}
+COMPANY_EMAIL=${COMPANY_EMAIL}
+COMPANY_TIMEZONE=${COMPANY_TIMEZONE}
 VITE_COMPANY_ID=${COMPANY_ID}
 EOF
 chmod 600 '$REMOTE_PROJECT/.env'"
