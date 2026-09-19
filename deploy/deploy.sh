@@ -126,6 +126,27 @@ done < "$CUSTOMER_FILE"
 : "${SENDER_EMAIL:?SENDER_EMAIL is missing in $CUSTOMER_FILE}"
 
 # ------------------------------------------------------------
+# Prevent duplicate customer deployments
+# ------------------------------------------------------------
+
+EXISTING_INSTANCE_ID="$(aws ec2 describe-instances \
+  --region "$AWS_REGION" \
+  --filters \
+    "Name=tag:Name,Values=$INSTANCE_NAME" \
+    "Name=instance-state-name,Values=pending,running,stopping,stopped" \
+  --query 'Reservations[].Instances[].InstanceId' \
+  --output text)"
+
+if [[ -n "$EXISTING_INSTANCE_ID" && "$EXISTING_INSTANCE_ID" != "None" ]]; then
+  echo "An instance already exists for customer '$CUSTOMER':"
+  echo "  Instance ID: $EXISTING_INSTANCE_ID"
+  echo "  Name:        $INSTANCE_NAME"
+  echo
+  echo "Deployment aborted to prevent duplicates."
+  exit 1
+fi
+
+# ------------------------------------------------------------
 # Determine latest Amazon Linux 2023 AMI
 # ------------------------------------------------------------
 
