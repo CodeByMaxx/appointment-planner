@@ -81,7 +81,7 @@ fi
 
 chmod 600 "$SSH_KEY"
 
-for command in aws ssh rsync; do
+for command in aws ssh rsync curl; do
   if ! command -v "$command" >/dev/null 2>&1; then
     echo "Required command not found: $command"
     exit 1
