@@ -53,7 +53,6 @@ REMOTE_PROJECT="/home/ec2-user/appointment-planner"
 # ------------------------------------------------------------
 
 API_PORT="3001"
-HTTP_PORT="80"
 
 COMPANY_ID=""
 
