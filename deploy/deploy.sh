@@ -199,7 +199,11 @@ echo "============================================================"
 if [[ "${DEPLOY_CONFIRM:-no}" != "yes" ]]; then
   echo
   echo "Dry run only."
-  echo "Set DEPLOY_CONFIRM=yes to create the EC2 instance."
+  if [[ "$DEPLOY_MODE" == "create" ]]; then
+    echo "Set DEPLOY_CONFIRM=yes to create the EC2 instance."
+  else
+    echo "Set DEPLOY_CONFIRM=yes to update the existing EC2 instance."
+  fi
   exit 0
 fi
 
