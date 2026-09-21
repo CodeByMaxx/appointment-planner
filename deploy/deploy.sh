@@ -124,7 +124,7 @@ done < "$CUSTOMER_FILE"
 : "${SENDER_EMAIL:?SENDER_EMAIL is missing in $CUSTOMER_FILE}"
 
 # ------------------------------------------------------------
-# Prevent duplicate customer deployments
+# Detect existing customer instance
 # ------------------------------------------------------------
 
 EXISTING_INSTANCE_ID="$(aws ec2 describe-instances \
@@ -135,13 +135,19 @@ EXISTING_INSTANCE_ID="$(aws ec2 describe-instances \
   --query 'Reservations[].Instances[].InstanceId' \
   --output text)"
 
+DEPLOY_MODE="create"
+
 if [[ -n "$EXISTING_INSTANCE_ID" && "$EXISTING_INSTANCE_ID" != "None" ]]; then
-  echo "An instance already exists for customer '$CUSTOMER':"
-  echo "  Instance ID: $EXISTING_INSTANCE_ID"
+  DEPLOY_MODE="update"
+  INSTANCE_ID="$EXISTING_INSTANCE_ID"
+
+  echo "Existing instance found for customer '$CUSTOMER':"
+  echo "  Instance ID: $INSTANCE_ID"
   echo "  Name:        $INSTANCE_NAME"
-  echo
-  echo "Deployment aborted to prevent duplicates."
-  exit 1
+  echo "  Mode:        UPDATE"
+else
+  echo "No existing instance found for customer '$CUSTOMER'."
+  echo "  Mode:        CREATE"
 fi
 
 # ------------------------------------------------------------
@@ -212,31 +218,37 @@ ssh_cmd() {
 }
 
 # ------------------------------------------------------------
-# 1. Create EC2 instance
+# 1. Create or reuse EC2 instance
 # ------------------------------------------------------------
 
-echo
-echo "==> Creating EC2 instance..."
+if [[ "$DEPLOY_MODE" == "create" ]]; then
+  echo
+  echo "==> Creating EC2 instance..."
 
-INSTANCE_ID="$(aws ec2 run-instances \
-  --region "$AWS_REGION" \
-  --image-id "$AMI_ID" \
-  --instance-type "$INSTANCE_TYPE" \
-  --subnet-id "$SUBNET_ID" \
-  --security-group-ids "$SECURITY_GROUP_ID" \
-  --key-name "$KEY_NAME" \
-  --iam-instance-profile Name="$IAM_INSTANCE_PROFILE" \
-  --tag-specifications \
-    "ResourceType=instance,Tags=[{Key=Name,Value=$INSTANCE_NAME},{Key=Project,Value=appointment-planner},{Key=Customer,Value=$CUSTOMER},{Key=Environment,Value=production}]" \
-  --query 'Instances[0].InstanceId' \
-  --output text)"
+  INSTANCE_ID="$(aws ec2 run-instances \
+    --region "$AWS_REGION" \
+    --image-id "$AMI_ID" \
+    --instance-type "$INSTANCE_TYPE" \
+    --subnet-id "$SUBNET_ID" \
+    --security-group-ids "$SECURITY_GROUP_ID" \
+    --key-name "$KEY_NAME" \
+    --iam-instance-profile Name="$IAM_INSTANCE_PROFILE" \
+    --tag-specifications \
+      "ResourceType=instance,Tags=[{Key=Name,Value=$INSTANCE_NAME},{Key=Project,Value=appointment-planner},{Key=Customer,Value=$CUSTOMER},{Key=Environment,Value=production}]" \
+    --query 'Instances[0].InstanceId' \
+    --output text)"
 
-echo "Instance ID: $INSTANCE_ID"
+  echo "Instance ID: $INSTANCE_ID"
+else
+  echo
+  echo "==> Updating existing EC2 instance..."
+  echo "Instance ID: $INSTANCE_ID"
+fi
 
 DEPLOY_SUCCESS="no"
 
 cleanup() {
-  if [[ "$DEPLOY_SUCCESS" != "yes" && -n "${INSTANCE_ID:-}" ]]; then
+  if [[ "$DEPLOY_SUCCESS" != "yes" && "$DEPLOY_MODE" == "create" && -n "${INSTANCE_ID:-}" ]]; then
     echo
     echo "Deployment failed. Terminating created EC2 instance..."
     aws ec2 terminate-instances \
@@ -250,8 +262,28 @@ cleanup() {
 trap cleanup EXIT
 
 # ------------------------------------------------------------
-# 2. Wait until EC2 is running
+# 2. Ensure EC2 instance is running
 # ------------------------------------------------------------
+
+echo
+echo "==> Checking EC2 instance state..."
+
+INSTANCE_STATE="$(aws ec2 describe-instances \
+  --region "$AWS_REGION" \
+  --instance-ids "$INSTANCE_ID" \
+  --query 'Reservations[0].Instances[0].State.Name' \
+  --output text)"
+
+echo "Current instance state: $INSTANCE_STATE"
+
+if [[ "$INSTANCE_STATE" == "stopped" ]]; then
+  echo "Starting stopped instance..."
+
+  aws ec2 start-instances \
+    --region "$AWS_REGION" \
+    --instance-ids "$INSTANCE_ID" \
+    >/dev/null
+fi
 
 echo
 echo "==> Waiting for EC2 instance to become running..."
