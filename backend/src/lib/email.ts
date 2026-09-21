@@ -348,3 +348,208 @@ export async function sendAppointmentEmails(
   );
 }
 
+
+export async function sendCancellationEmails(
+  data: AppointmentEmailData
+) {
+  const fromEmail = process.env.SES_FROM_EMAIL;
+
+  if (!fromEmail) {
+    throw new Error("SES_FROM_EMAIL is not configured");
+  }
+
+  const customerName = escapeHtml(data.customerName);
+  const companyName = escapeHtml(data.companyName);
+  const serviceName = escapeHtml(data.serviceName);
+
+  const appointmentDate = formatDate(
+    data.startTime,
+    data.companyTimezone
+  );
+
+  const customerHtml = emailLayout(
+    data.companyName,
+    `
+      <h1 style="
+        margin: 0 0 20px 0;
+        font-size: 26px;
+        color: #111827;
+      ">
+        Termin storniert
+      </h1>
+
+      <p style="
+        margin: 0 0 20px 0;
+        font-size: 16px;
+        line-height: 1.6;
+      ">
+        Hallo ${customerName},
+      </p>
+
+      <p style="
+        margin: 0 0 28px 0;
+        font-size: 16px;
+        line-height: 1.6;
+      ">
+        Ihr Termin bei <strong>${companyName}</strong>
+        wurde storniert.
+      </p>
+
+      <div style="
+        background: #f9fafb;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 24px;
+      ">
+        <div style="
+          margin-bottom: 14px;
+          font-size: 14px;
+          color: #6b7280;
+        ">
+          LEISTUNG
+        </div>
+
+        <div style="
+          font-size: 17px;
+          font-weight: bold;
+          margin-bottom: 20px;
+        ">
+          ${serviceName}
+        </div>
+
+        <div style="
+          margin-bottom: 14px;
+          font-size: 14px;
+          color: #6b7280;
+        ">
+          TERMIN
+        </div>
+
+        <div style="
+          font-size: 17px;
+          font-weight: bold;
+        ">
+          ${escapeHtml(appointmentDate)}
+        </div>
+      </div>
+    `
+  );
+
+  await ses.send(
+    new SendEmailCommand({
+      Source: fromEmail,
+      Destination: {
+        ToAddresses: [data.customerEmail],
+      },
+      Message: {
+        Subject: {
+          Data: `Termin storniert – ${data.companyName}`,
+          Charset: "UTF-8",
+        },
+        Body: {
+          Html: {
+            Data: customerHtml,
+            Charset: "UTF-8",
+          },
+        },
+      },
+    })
+  );
+
+  const companyHtml = emailLayout(
+    data.companyName,
+    `
+      <h1 style="
+        margin: 0 0 20px 0;
+        font-size: 26px;
+        color: #111827;
+      ">
+        Termin storniert
+      </h1>
+
+      <p style="
+        margin: 0 0 28px 0;
+        font-size: 16px;
+        line-height: 1.6;
+      ">
+        Ein Termin wurde storniert.
+      </p>
+
+      <div style="
+        background: #f9fafb;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        padding: 20px;
+      ">
+        <div style="
+          margin-bottom: 14px;
+          font-size: 14px;
+          color: #6b7280;
+        ">
+          KUNDE
+        </div>
+
+        <div style="
+          font-size: 17px;
+          font-weight: bold;
+          margin-bottom: 20px;
+        ">
+          ${customerName}
+        </div>
+
+        <div style="
+          margin-bottom: 14px;
+          font-size: 14px;
+          color: #6b7280;
+        ">
+          LEISTUNG
+        </div>
+
+        <div style="
+          font-size: 17px;
+          font-weight: bold;
+          margin-bottom: 20px;
+        ">
+          ${serviceName}
+        </div>
+
+        <div style="
+          margin-bottom: 14px;
+          font-size: 14px;
+          color: #6b7280;
+        ">
+          TERMIN
+        </div>
+
+        <div style="
+          font-size: 17px;
+          font-weight: bold;
+        ">
+          ${escapeHtml(appointmentDate)}
+        </div>
+      </div>
+    `
+  );
+
+  await ses.send(
+    new SendEmailCommand({
+      Source: fromEmail,
+      Destination: {
+        ToAddresses: [data.companyEmail],
+      },
+      Message: {
+        Subject: {
+          Data: `Termin storniert – ${data.customerName}`,
+          Charset: "UTF-8",
+        },
+        Body: {
+          Html: {
+            Data: companyHtml,
+            Charset: "UTF-8",
+          },
+        },
+      },
+    })
+  );
+}

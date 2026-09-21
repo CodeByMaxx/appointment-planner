@@ -1,6 +1,6 @@
 import { FastifyInstance } from "fastify";
 import prisma from "../lib/prisma";
-import { sendAppointmentEmails } from "../lib/email";
+import { sendAppointmentEmails, sendCancellationEmails } from "../lib/email";
 
 function getLocalParts(date: Date, timeZone: string) {
   const formatter = new Intl.DateTimeFormat("en-US", {
@@ -292,6 +292,10 @@ export default async function appointmentsRoutes(app: FastifyInstance) {
       where: {
         id,
       },
+      include: {
+        company: true,
+        service: true,
+      },
     });
 
     if (!appointment) {
@@ -315,6 +319,36 @@ export default async function appointmentsRoutes(app: FastifyInstance) {
           status: "CANCELLED",
         },
       });
+
+    try {
+      await sendCancellationEmails({
+        customerName: cancelledAppointment.customerName,
+        customerEmail: cancelledAppointment.customerEmail,
+        companyName: appointment.company.name,
+        companyEmail: appointment.company.email,
+        companyTimezone: appointment.company.timezone,
+        serviceName: appointment.service.name,
+        startTime: cancelledAppointment.startTime,
+        endTime: cancelledAppointment.endTime,
+      });
+
+      app.log.info(
+        {
+          appointmentId: cancelledAppointment.id,
+          customerEmail: cancelledAppointment.customerEmail,
+          companyEmail: appointment.company.email,
+        },
+        "Cancellation emails sent"
+      );
+    } catch (error) {
+      app.log.error(
+        {
+          error,
+          appointmentId: cancelledAppointment.id,
+        },
+        "Appointment cancelled, but email notification failed"
+      );
+    }
 
     return cancelledAppointment;
   });
