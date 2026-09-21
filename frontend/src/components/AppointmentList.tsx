@@ -1,25 +1,10 @@
 import API_URL from "../lib/api";
 import { useEffect, useState } from "react";
 
+import AppointmentWeekView from "./AppointmentWeekView";
+import type { Appointment } from "./appointmentTypes";
+
 const COMPANY_ID = import.meta.env.VITE_COMPANY_ID;
-
-type Service = {
-  id: string;
-  name: string;
-  durationMinutes: number;
-  active: boolean;
-};
-
-type Appointment = {
-  id: string;
-  customerName: string;
-  customerEmail: string;
-  message?: string;
-  startTime: string;
-  endTime: string;
-  status: string;
-  service: Service;
-};
 
 function formatDate(dateString: string) {
   return new Date(dateString).toLocaleDateString(
@@ -50,6 +35,9 @@ export default function AppointmentList() {
     useState<Appointment[]>([]);
 
   const [loading, setLoading] = useState(true);
+
+  const [view, setView] =
+    useState<"list" | "week">("list");
 
   async function loadAppointments() {
     setLoading(true);
@@ -114,6 +102,7 @@ export default function AppointmentList() {
       );
     } catch (error) {
       console.error(error);
+
       alert(
         "Der Server konnte nicht erreicht werden."
       );
@@ -168,89 +157,132 @@ export default function AppointmentList() {
         </div>
       ) : (
         <div>
-          {sortedAppointments.map(
-            (appointment) => {
-              const cancelled =
-                appointment.status ===
-                "CANCELLED";
+          <div className="appointment-view-toggle">
+            <button
+              type="button"
+              className={
+                view === "list"
+                  ? "secondary-button active"
+                  : "secondary-button"
+              }
+              onClick={() =>
+                setView("list")
+              }
+            >
+              Liste
+            </button>
 
-              return (
-                <article
-                  key={appointment.id}
-                  className={
-                    cancelled
-                      ? "appointment cancelled"
-                      : "appointment"
-                  }
-                >
-                  <div>
-                    <p className="appointment-date">
-                      {formatDate(
-                        appointment.startTime
-                      )}
-                    </p>
+            <button
+              type="button"
+              className={
+                view === "week"
+                  ? "secondary-button active"
+                  : "secondary-button"
+              }
+              onClick={() =>
+                setView("week")
+              }
+            >
+              Woche
+            </button>
+          </div>
 
-                    <h3>
-                      {formatTime(
-                        appointment.startTime
-                      )}{" "}
-                      –{" "}
-                      {formatTime(
-                        appointment.endTime
-                      )}
-                    </h3>
+          {view === "week" ? (
+            <AppointmentWeekView
+              appointments={sortedAppointments}
+              onCancel={cancelAppointment}
+            />
+          ) : (
+            <div>
+              {sortedAppointments.map(
+                (appointment) => {
+                  const cancelled =
+                    appointment.status ===
+                    "CANCELLED";
 
-                    <p>
-                      <strong>
-                        {appointment.customerName}
-                      </strong>
-                    </p>
-
-                    <p>
-                      {appointment.service.name}
-                    </p>
-
-                    <p className="muted">
-                      {appointment.customerEmail}
-                    </p>
-
-                    {appointment.message && (
-                      <p>
-                        <strong>
-                          Nachricht:
-                        </strong>{" "}
-                        {appointment.message}
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="appointment-actions">
-                    <span
+                  return (
+                    <article
+                      key={appointment.id}
                       className={
                         cancelled
-                          ? "status cancelled"
-                          : "status confirmed"
+                          ? "appointment cancelled"
+                          : "appointment"
                       }
                     >
-                      {appointment.status}
-                    </span>
+                      <div>
+                        <p className="appointment-date">
+                          {formatDate(
+                            appointment.startTime
+                          )}
+                        </p>
 
-                    {!cancelled && (
-                      <button
-                        className="danger-button"
-                        onClick={() =>
-                          cancelAppointment(
-                            appointment.id
-                          )
-                        }
-                      >
-                        Stornieren
-                      </button>
-                    )}
-                  </div>
-                </article>
-              );
-            }
+                        <h3>
+                          {formatTime(
+                            appointment.startTime
+                          )}{" "}
+                          –{" "}
+                          {formatTime(
+                            appointment.endTime
+                          )}
+                        </h3>
+
+                        <p>
+                          <strong>
+                            {
+                              appointment.customerName
+                            }
+                          </strong>
+                        </p>
+
+                        <p>
+                          {appointment.service.name}
+                        </p>
+
+                        <p className="muted">
+                          {
+                            appointment.customerEmail
+                          }
+                        </p>
+
+                        {appointment.message && (
+                          <p>
+                            <strong>
+                              Nachricht:
+                            </strong>{" "}
+                            {appointment.message}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="appointment-actions">
+                        <span
+                          className={
+                            cancelled
+                              ? "status cancelled"
+                              : "status confirmed"
+                          }
+                        >
+                          {appointment.status}
+                        </span>
+
+                        {!cancelled && (
+                          <button
+                            className="danger-button"
+                            onClick={() =>
+                              cancelAppointment(
+                                appointment.id
+                              )
+                            }
+                          >
+                            Stornieren
+                          </button>
+                        )}
+                      </div>
+                    </article>
+                  );
+                }
+              )}
+            </div>
           )}
         </div>
       )}
