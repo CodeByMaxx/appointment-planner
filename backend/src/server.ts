@@ -15,6 +15,7 @@ const start = async () => {
   try {
     await app.register(cors, {
       origin: true,
+      methods: ["GET", "HEAD", "POST", "PATCH", "OPTIONS"],
     });
 
     app.get("/health", async () => {
