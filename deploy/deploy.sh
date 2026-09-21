@@ -235,6 +235,22 @@ INSTANCE_ID="$(aws ec2 run-instances \
 
 echo "Instance ID: $INSTANCE_ID"
 
+DEPLOY_SUCCESS="no"
+
+cleanup() {
+  if [[ "$DEPLOY_SUCCESS" != "yes" && -n "${INSTANCE_ID:-}" ]]; then
+    echo
+    echo "Deployment failed. Terminating created EC2 instance..."
+    aws ec2 terminate-instances \
+      --region "$AWS_REGION" \
+      --instance-ids "$INSTANCE_ID" \
+      >/dev/null
+    echo "Instance terminated: $INSTANCE_ID"
+  fi
+}
+
+trap cleanup EXIT
+
 # ------------------------------------------------------------
 # 2. Wait until EC2 is running
 # ------------------------------------------------------------
@@ -530,5 +546,7 @@ echo
 echo "Company ID:"
 echo "  ${COMPANY_ID}"
 echo
+DEPLOY_SUCCESS="yes"
+
 echo "============================================================"
 
