@@ -14,6 +14,7 @@ type Appointment = {
   id: string;
   customerName: string;
   customerEmail: string;
+  message?: string;
   startTime: string;
   endTime: string;
   status: string;
@@ -84,7 +85,9 @@ export default function AppointmentList() {
     }
 
     try {
-      const response = await fetch(`${API_URL}/appointments/${id}/cancel`, { 
+      const response = await fetch(
+        `${API_URL}/appointments/${id}/cancel`,
+        {
           method: "PATCH",
         }
       );
@@ -210,6 +213,15 @@ export default function AppointmentList() {
                     <p className="muted">
                       {appointment.customerEmail}
                     </p>
+
+                    {appointment.message && (
+                      <p>
+                        <strong>
+                          Nachricht:
+                        </strong>{" "}
+                        {appointment.message}
+                      </p>
+                    )}
                   </div>
 
                   <div className="appointment-actions">
@@ -245,3 +257,4 @@ export default function AppointmentList() {
     </section>
   );
 }
+

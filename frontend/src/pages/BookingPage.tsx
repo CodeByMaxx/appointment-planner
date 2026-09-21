@@ -35,6 +35,7 @@ export default function BookingPage() {
 
   const [customerName, setCustomerName] = useState("");
   const [customerEmail, setCustomerEmail] = useState("");
+  const [message, setMessage] = useState("");
 
   const [booking, setBooking] = useState(false);
   const [bookingSuccess, setBookingSuccess] = useState(false);
@@ -110,13 +111,16 @@ export default function BookingPage() {
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({
-            companyId: COMPANY_ID,
-            serviceId: selectedService,
-            customerName: customerName.trim(),
-            customerEmail: customerEmail.trim(),
-            startTime: selectedTime,
-          }),
+          
+         body: JSON.stringify({
+          companyId: COMPANY_ID,
+          serviceId: selectedService,
+          customerName: customerName.trim(),
+          customerEmail: customerEmail.trim(),
+          message: message.trim(),
+          startTime: selectedTime,
+       }),
+
         }
       );
 
@@ -297,6 +301,20 @@ export default function BookingPage() {
                   />
                 </div>
 
+                <div className="form-group">
+                    <label htmlFor="message">
+                    Nachricht / Anliegen
+                    </label>
+
+                <textarea
+                    id="message"
+                    value={message}
+                    onChange={(event) => setMessage(event.target.value)}
+                    placeholder="Optional: Worum geht es bei Ihrem Termin?"
+                    rows={4}
+                    />
+                </div>
+                
                 <button
                   className="primary-button"
                   onClick={handleBooking}

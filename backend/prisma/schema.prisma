@@ -50,6 +50,7 @@ model Appointment {
   serviceId     String
   customerName  String
   customerEmail String
+  message       String?
   startTime     DateTime
   endTime       DateTime
   status        String   @default("CONFIRMED")

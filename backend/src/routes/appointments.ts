@@ -43,6 +43,7 @@ export default async function appointmentsRoutes(app: FastifyInstance) {
       serviceId: string;
       customerName: string;
       customerEmail: string;
+      message?: string;
       startTime: string;
     };
   }>("/appointments", async (request, reply) => {
@@ -51,6 +52,7 @@ export default async function appointmentsRoutes(app: FastifyInstance) {
       serviceId,
       customerName,
       customerEmail,
+      message,
       startTime,
     } = request.body;
 
@@ -183,6 +185,7 @@ export default async function appointmentsRoutes(app: FastifyInstance) {
         serviceId,
         customerName,
         customerEmail,
+        message,
         startTime: start,
         endTime: end,
         status: "CONFIRMED",
