@@ -80,7 +80,7 @@ fi
 
 chmod 600 "$SSH_KEY"
 
-for command in aws ssh rsync curl; do
+for command in aws ssh rsync curl python3; do
   if ! command -v "$command" >/dev/null 2>&1; then
     echo "Required command not found: $command"
     exit 1
@@ -250,16 +250,32 @@ else
 fi
 
 DEPLOY_SUCCESS="no"
+ELASTIC_IP_ALLOCATION_ID=""
+ELASTIC_IP_ASSOCIATION_ID=""
+PUBLIC_IP=""
+ELASTIC_IP_NEWLY_ALLOCATED="no"
 
 cleanup() {
-  if [[ "$DEPLOY_SUCCESS" != "yes" && "$DEPLOY_MODE" == "create" && -n "${INSTANCE_ID:-}" ]]; then
+  if [[ "$DEPLOY_SUCCESS" != "yes" && "$DEPLOY_MODE" == "create" ]]; then
     echo
-    echo "Deployment failed. Terminating created EC2 instance..."
-    aws ec2 terminate-instances \
-      --region "$AWS_REGION" \
-      --instance-ids "$INSTANCE_ID" \
-      >/dev/null
-    echo "Instance terminated: $INSTANCE_ID"
+
+    if [[ -n "${INSTANCE_ID:-}" ]]; then
+      echo "Deployment failed. Terminating created EC2 instance..."
+      aws ec2 terminate-instances \
+        --region "$AWS_REGION" \
+        --instance-ids "$INSTANCE_ID" \
+        >/dev/null
+      echo "Instance terminated: $INSTANCE_ID"
+    fi
+
+    if [[ "$ELASTIC_IP_NEWLY_ALLOCATED" == "yes" && -n "${ELASTIC_IP_ALLOCATION_ID:-}" ]]; then
+      echo "Releasing newly allocated Elastic IP..."
+      aws ec2 release-address \
+        --region "$AWS_REGION" \
+        --allocation-id "$ELASTIC_IP_ALLOCATION_ID" \
+        >/dev/null
+      echo "Elastic IP released: $PUBLIC_IP"
+    fi
   fi
 }
 
@@ -299,21 +315,91 @@ aws ec2 wait instance-running \
 echo "Instance is running."
 
 # ------------------------------------------------------------
-# 3. Get public IP
+# 3. Ensure Elastic IP
 # ------------------------------------------------------------
 
-PUBLIC_IP="$(aws ec2 describe-instances \
-  --region "$AWS_REGION" \
-  --instance-ids "$INSTANCE_ID" \
-  --query 'Reservations[0].Instances[0].PublicIpAddress' \
-  --output text)"
+echo
+echo "==> Checking Elastic IP..."
 
-if [[ -z "$PUBLIC_IP" || "$PUBLIC_IP" == "None" ]]; then
-  echo "Could not determine public IP."
+EXISTING_EIP="$(aws ec2 describe-addresses \
+  --region "$AWS_REGION" \
+  --filters "Name=tag:Customer,Values=$CUSTOMER" \
+  --query 'Addresses[0].{PublicIp:PublicIp,AllocationId:AllocationId,AssociationId:AssociationId,InstanceId:InstanceId}' \
+  --output json)"
+
+if [[ "$EXISTING_EIP" != "null" && "$EXISTING_EIP" != "{}" ]]; then
+  ELASTIC_IP_ALLOCATION_ID="$(echo "$EXISTING_EIP" | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d.get("AllocationId",""))')"
+  ELASTIC_IP_ASSOCIATION_ID="$(echo "$EXISTING_EIP" | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d.get("AssociationId",""))')"
+  PUBLIC_IP="$(echo "$EXISTING_EIP" | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d.get("PublicIp",""))')"
+  EIP_INSTANCE_ID="$(echo "$EXISTING_EIP" | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d.get("InstanceId",""))')"
+
+  echo "Existing Elastic IP found: $PUBLIC_IP"
+
+  if [[ -n "$EIP_INSTANCE_ID" && "$EIP_INSTANCE_ID" != "$INSTANCE_ID" ]]; then
+    echo "Elastic IP is attached to another instance: $EIP_INSTANCE_ID"
+    echo "Re-associating Elastic IP with current instance: $INSTANCE_ID"
+
+    ELASTIC_IP_ASSOCIATION_ID="$(aws ec2 associate-address \
+      --region "$AWS_REGION" \
+      --instance-id "$INSTANCE_ID" \
+      --allocation-id "$ELASTIC_IP_ALLOCATION_ID" \
+      --query 'AssociationId' \
+      --output text)"
+
+    echo "Elastic IP re-associated: $PUBLIC_IP"
+  elif [[ -z "$ELASTIC_IP_ASSOCIATION_ID" ]]; then
+    echo "Associating existing Elastic IP with current instance..."
+
+    ELASTIC_IP_ASSOCIATION_ID="$(aws ec2 associate-address \
+      --region "$AWS_REGION" \
+      --instance-id "$INSTANCE_ID" \
+      --allocation-id "$ELASTIC_IP_ALLOCATION_ID" \
+      --query 'AssociationId' \
+      --output text)"
+
+    echo "Elastic IP associated: $PUBLIC_IP"
+  fi
+else
+  echo "No Elastic IP found for customer '$CUSTOMER'. Allocating one..."
+
+  EIP_DATA="$(aws ec2 allocate-address \
+    --region "$AWS_REGION" \
+    --domain vpc \
+    --query '{PublicIp:PublicIp,AllocationId:AllocationId}' \
+    --output json)"
+
+  ELASTIC_IP_ALLOCATION_ID="$(echo "$EIP_DATA" | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d["AllocationId"])')"
+  PUBLIC_IP="$(echo "$EIP_DATA" | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d["PublicIp"])')"
+
+  echo "Elastic IP allocated: $PUBLIC_IP"
+  ELASTIC_IP_NEWLY_ALLOCATED="yes"
+
+  aws ec2 create-tags \
+    --region "$AWS_REGION" \
+    --resources "$ELASTIC_IP_ALLOCATION_ID" \
+    --tags \
+      "Key=Customer,Value=$CUSTOMER" \
+      "Key=Project,Value=appointment-planner" \
+      "Key=Environment,Value=production"
+
+  echo "Elastic IP tagged for customer: $CUSTOMER"
+
+  ELASTIC_IP_ASSOCIATION_ID="$(aws ec2 associate-address \
+    --region "$AWS_REGION" \
+    --instance-id "$INSTANCE_ID" \
+    --allocation-id "$ELASTIC_IP_ALLOCATION_ID" \
+    --query 'AssociationId' \
+    --output text)"
+
+  echo "Elastic IP associated: $PUBLIC_IP"
+fi
+
+if [[ -z "$PUBLIC_IP" ]]; then
+  echo "Could not determine Elastic IP."
   exit 1
 fi
 
-echo "Public IP: $PUBLIC_IP"
+echo "Elastic IP: $PUBLIC_IP"
 
 # ------------------------------------------------------------
 # 4. Wait for SSH
