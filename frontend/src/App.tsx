@@ -3,14 +3,12 @@ import BookingPage from "./pages/BookingPage";
 import DashboardPage from "./pages/DashboardPage";
 import LoginPage from "./pages/LoginPage";
 
-type View = "booking" | "dashboard";
-
 function App() {
+  const isAdminApp = window.location.port === "8080";
+
   const [authenticated, setAuthenticated] = useState(
     sessionStorage.getItem("admin_authenticated") === "true"
   );
-
-  const [view, setView] = useState<View>("booking");
 
   const handleLogin = () => {
     sessionStorage.setItem("admin_authenticated", "true");
@@ -22,6 +20,12 @@ function App() {
     setAuthenticated(false);
   };
 
+  // Public customer area on port 80
+  if (!isAdminApp) {
+    return <BookingPage />;
+  }
+
+  // Admin area on port 8080
   if (!authenticated) {
     return <LoginPage onLogin={handleLogin} />;
   }
@@ -32,23 +36,12 @@ function App() {
         <h1>Appointment Planner</h1>
 
         <nav>
-          <button onClick={() => setView("booking")}>
-            Termin buchen
-          </button>
-
-          <button onClick={() => setView("dashboard")}>
-            Dashboard
-          </button>
-
-          <button onClick={handleLogout}>
-            Abmelden
-          </button>
+          <button onClick={handleLogout}>Abmelden</button>
         </nav>
       </header>
 
       <main>
-        {view === "booking" && <BookingPage />}
-        {view === "dashboard" && <DashboardPage />}
+        <DashboardPage />
       </main>
     </div>
   );
