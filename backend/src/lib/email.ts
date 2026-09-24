@@ -16,6 +16,7 @@ type AppointmentEmailData = {
   serviceName: string;
   startTime: Date;
   endTime: Date;
+  cancellationCode?: string;
 };
 
 const escapeHtml = (value: string) =>
@@ -39,94 +40,69 @@ const emailLayout = (
 ) => `
 <!DOCTYPE html>
 <html lang="de">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Appointment Planner</title>
-</head>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>${escapeHtml(companyName)}</title>
+  </head>
 
-<body style="
-  margin: 0;
-  padding: 0;
-  background-color: #f4f6f8;
-  font-family: Arial, Helvetica, sans-serif;
-  color: #1f2937;
-">
-
-  <div style="
-    max-width: 600px;
-    margin: 40px auto;
-    background: #ffffff;
-    border-radius: 12px;
-    overflow: hidden;
-    border: 1px solid #e5e7eb;
+  <body style="
+    margin: 0;
+    padding: 0;
+    background: #f3f4f6;
+    font-family: Arial, Helvetica, sans-serif;
+    color: #111827;
   ">
 
     <div style="
-      padding: 24px 32px;
-      background: #111827;
-      color: #ffffff;
+      max-width: 640px;
+      margin: 0 auto;
+      padding: 40px 20px;
     ">
-      <div style="
-        font-size: 14px;
-        opacity: 0.75;
-        margin-bottom: 6px;
-      ">
-        Appointment Planner
-      </div>
 
       <div style="
-        font-size: 22px;
-        font-weight: bold;
+        background: #ffffff;
+        border-radius: 12px;
+        padding: 32px;
       ">
-        ${escapeHtml(companyName)}
+
+        <div style="
+          margin-bottom: 28px;
+          font-size: 18px;
+          font-weight: bold;
+          color: #111827;
+        ">
+          ${escapeHtml(companyName)}
+        </div>
+
+        ${content}
+
       </div>
+
+      <p style="
+        margin: 20px 0 0 0;
+        text-align: center;
+        font-size: 12px;
+        color: #9ca3af;
+      ">
+        Diese E-Mail wurde automatisch vom Appointment Planner versendet.
+      </p>
+
     </div>
-
-    <div style="
-      padding: 32px;
-    ">
-      ${content}
-    </div>
-
-    <div style="
-      padding: 20px 32px;
-      background: #f9fafb;
-      border-top: 1px solid #e5e7eb;
-      color: #6b7280;
-      font-size: 12px;
-    ">
-      Diese E-Mail wurde automatisch vom Appointment Planner versendet.
-    </div>
-
-  </div>
-
-</body>
+  </body>
 </html>
 `;
 
 export async function sendAppointmentEmails(
   data: AppointmentEmailData
 ) {
-  const fromEmail = process.env.SES_FROM_EMAIL;
-
-  if (!fromEmail) {
-    throw new Error("SES_FROM_EMAIL is not configured");
-  }
-
-  const customerName = escapeHtml(data.customerName);
-  const customerEmail = escapeHtml(data.customerEmail);
-  const companyName = escapeHtml(data.companyName);
-  const serviceName = escapeHtml(data.serviceName);
+  const fromEmail =
+    process.env.SES_FROM_EMAIL || data.companyEmail;
 
   const appointmentDate = formatDate(
     data.startTime,
     data.companyTimezone
   );
-
-  // --------------------------------------------------
-  // E-Mail an den Kunden
-  // --------------------------------------------------
 
   const customerHtml = emailLayout(
     data.companyName,
@@ -140,11 +116,11 @@ export async function sendAppointmentEmails(
       </h1>
 
       <p style="
-        margin: 0 0 20px 0;
+        margin: 0 0 28px 0;
         font-size: 16px;
         line-height: 1.6;
       ">
-        Hallo ${customerName},
+        Hallo ${escapeHtml(data.customerName)},
       </p>
 
       <p style="
@@ -152,8 +128,7 @@ export async function sendAppointmentEmails(
         font-size: 16px;
         line-height: 1.6;
       ">
-        Ihr Termin bei <strong>${companyName}</strong>
-        wurde erfolgreich bestätigt.
+        Ihr Termin wurde erfolgreich gebucht.
       </p>
 
       <div style="
@@ -177,7 +152,7 @@ export async function sendAppointmentEmails(
           font-weight: bold;
           margin-bottom: 20px;
         ">
-          ${serviceName}
+          ${escapeHtml(data.serviceName)}
         </div>
 
         <div style="
@@ -197,41 +172,44 @@ export async function sendAppointmentEmails(
 
       </div>
 
+      <div style="
+        background: #f9fafb;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 24px;
+      ">
+
+        <div style="
+          margin-bottom: 14px;
+          font-size: 14px;
+          color: #6b7280;
+        ">
+          STORNIERCODE
+        </div>
+
+        <div style="
+          font-size: 26px;
+          font-weight: bold;
+          letter-spacing: 3px;
+          color: #111827;
+        ">
+          ${escapeHtml(data.cancellationCode || "")}
+        </div>
+
+      </div>
+
       <p style="
         margin: 0;
         font-size: 14px;
         line-height: 1.6;
         color: #6b7280;
       ">
-        Vielen Dank für Ihre Buchung.
+        Mit diesem 12-stelligen Code können Sie Ihren Termin
+        später online stornieren.
       </p>
     `
   );
-
-  await ses.send(
-    new SendEmailCommand({
-      Source: fromEmail,
-      Destination: {
-        ToAddresses: [data.customerEmail],
-      },
-      Message: {
-        Subject: {
-          Data: `Terminbestätigung – ${data.companyName}`,
-          Charset: "UTF-8",
-        },
-        Body: {
-          Html: {
-            Data: customerHtml,
-            Charset: "UTF-8",
-          },
-        },
-      },
-    })
-  );
-
-  // --------------------------------------------------
-  // E-Mail an die Firma
-  // --------------------------------------------------
 
   const companyHtml = emailLayout(
     data.companyName,
@@ -273,7 +251,7 @@ export async function sendAppointmentEmails(
           font-weight: bold;
           margin-bottom: 20px;
         ">
-          ${customerName}
+          ${escapeHtml(data.customerName)}
         </div>
 
         <div style="
@@ -288,7 +266,7 @@ export async function sendAppointmentEmails(
           font-size: 16px;
           margin-bottom: 20px;
         ">
-          ${customerEmail}
+          ${escapeHtml(data.customerEmail)}
         </div>
 
         <div style="
@@ -304,7 +282,7 @@ export async function sendAppointmentEmails(
           font-weight: bold;
           margin-bottom: 20px;
         ">
-          ${serviceName}
+          ${escapeHtml(data.serviceName)}
         </div>
 
         <div style="
@@ -318,49 +296,90 @@ export async function sendAppointmentEmails(
         <div style="
           font-size: 17px;
           font-weight: bold;
+          margin-bottom: 20px;
         ">
           ${escapeHtml(appointmentDate)}
         </div>
 
+        <div style="
+          margin-bottom: 14px;
+          font-size: 14px;
+          color: #6b7280;
+        ">
+          STORNIERCODE
+        </div>
+
+        <div style="
+          font-size: 20px;
+          font-weight: bold;
+          letter-spacing: 2px;
+        ">
+          ${escapeHtml(data.cancellationCode || "")}
+        </div>
+
       </div>
+
+      <p style="
+        margin: 0;
+        font-size: 14px;
+        line-height: 1.6;
+        color: #6b7280;
+      ">
+        Der Termin wurde erfolgreich im Appointment Planner angelegt.
+      </p>
     `
   );
 
-  await ses.send(
-    new SendEmailCommand({
-      Source: fromEmail,
-      Destination: {
-        ToAddresses: [data.companyEmail],
-      },
-      Message: {
-        Subject: {
-          Data: `Neue Terminbuchung – ${data.customerName}`,
-          Charset: "UTF-8",
+  await Promise.all([
+    ses.send(
+      new SendEmailCommand({
+        Source: fromEmail,
+        Destination: {
+          ToAddresses: [data.customerEmail],
         },
-        Body: {
-          Html: {
-            Data: companyHtml,
+        Message: {
+          Subject: {
+            Data: `Termin bestätigt – ${data.companyName}`,
             Charset: "UTF-8",
           },
+          Body: {
+            Html: {
+              Data: customerHtml,
+              Charset: "UTF-8",
+            },
+          },
         },
-      },
-    })
-  );
-}
+      })
+    ),
 
+    ses.send(
+      new SendEmailCommand({
+        Source: fromEmail,
+        Destination: {
+          ToAddresses: [data.companyEmail],
+        },
+        Message: {
+          Subject: {
+            Data: `Neue Terminbuchung – ${data.companyName}`,
+            Charset: "UTF-8",
+          },
+          Body: {
+            Html: {
+              Data: companyHtml,
+              Charset: "UTF-8",
+            },
+          },
+        },
+      })
+    ),
+  ]);
+}
 
 export async function sendCancellationEmails(
   data: AppointmentEmailData
 ) {
-  const fromEmail = process.env.SES_FROM_EMAIL;
-
-  if (!fromEmail) {
-    throw new Error("SES_FROM_EMAIL is not configured");
-  }
-
-  const customerName = escapeHtml(data.customerName);
-  const companyName = escapeHtml(data.companyName);
-  const serviceName = escapeHtml(data.serviceName);
+  const fromEmail =
+    process.env.SES_FROM_EMAIL || data.companyEmail;
 
   const appointmentDate = formatDate(
     data.startTime,
@@ -379,11 +398,11 @@ export async function sendCancellationEmails(
       </h1>
 
       <p style="
-        margin: 0 0 20px 0;
+        margin: 0 0 28px 0;
         font-size: 16px;
         line-height: 1.6;
       ">
-        Hallo ${customerName},
+        Hallo ${escapeHtml(data.customerName)},
       </p>
 
       <p style="
@@ -391,8 +410,7 @@ export async function sendCancellationEmails(
         font-size: 16px;
         line-height: 1.6;
       ">
-        Ihr Termin bei <strong>${companyName}</strong>
-        wurde storniert.
+        Ihr Termin wurde erfolgreich storniert.
       </p>
 
       <div style="
@@ -402,6 +420,7 @@ export async function sendCancellationEmails(
         padding: 20px;
         margin-bottom: 24px;
       ">
+
         <div style="
           margin-bottom: 14px;
           font-size: 14px;
@@ -415,7 +434,7 @@ export async function sendCancellationEmails(
           font-weight: bold;
           margin-bottom: 20px;
         ">
-          ${serviceName}
+          ${escapeHtml(data.serviceName)}
         </div>
 
         <div style="
@@ -432,29 +451,18 @@ export async function sendCancellationEmails(
         ">
           ${escapeHtml(appointmentDate)}
         </div>
-      </div>
-    `
-  );
 
-  await ses.send(
-    new SendEmailCommand({
-      Source: fromEmail,
-      Destination: {
-        ToAddresses: [data.customerEmail],
-      },
-      Message: {
-        Subject: {
-          Data: `Termin storniert – ${data.companyName}`,
-          Charset: "UTF-8",
-        },
-        Body: {
-          Html: {
-            Data: customerHtml,
-            Charset: "UTF-8",
-          },
-        },
-      },
-    })
+      </div>
+
+      <p style="
+        margin: 0;
+        font-size: 14px;
+        line-height: 1.6;
+        color: #6b7280;
+      ">
+        Bei Fragen können Sie sich gerne direkt an uns wenden.
+      </p>
+    `
   );
 
   const companyHtml = emailLayout(
@@ -473,7 +481,7 @@ export async function sendCancellationEmails(
         font-size: 16px;
         line-height: 1.6;
       ">
-        Ein Termin wurde storniert.
+        Ein Termin wurde vom Kunden storniert.
       </p>
 
       <div style="
@@ -481,7 +489,9 @@ export async function sendCancellationEmails(
         border: 1px solid #e5e7eb;
         border-radius: 8px;
         padding: 20px;
+        margin-bottom: 24px;
       ">
+
         <div style="
           margin-bottom: 14px;
           font-size: 14px;
@@ -495,7 +505,22 @@ export async function sendCancellationEmails(
           font-weight: bold;
           margin-bottom: 20px;
         ">
-          ${customerName}
+          ${escapeHtml(data.customerName)}
+        </div>
+
+        <div style="
+          margin-bottom: 14px;
+          font-size: 14px;
+          color: #6b7280;
+        ">
+          E-MAIL
+        </div>
+
+        <div style="
+          font-size: 16px;
+          margin-bottom: 20px;
+        ">
+          ${escapeHtml(data.customerEmail)}
         </div>
 
         <div style="
@@ -511,7 +536,7 @@ export async function sendCancellationEmails(
           font-weight: bold;
           margin-bottom: 20px;
         ">
-          ${serviceName}
+          ${escapeHtml(data.serviceName)}
         </div>
 
         <div style="
@@ -528,28 +553,62 @@ export async function sendCancellationEmails(
         ">
           ${escapeHtml(appointmentDate)}
         </div>
+
       </div>
+
+      <p style="
+        margin: 0;
+        font-size: 14px;
+        line-height: 1.6;
+        color: #6b7280;
+      ">
+        Der Termin wurde im Appointment Planner als storniert markiert.
+      </p>
     `
   );
 
-  await ses.send(
-    new SendEmailCommand({
-      Source: fromEmail,
-      Destination: {
-        ToAddresses: [data.companyEmail],
-      },
-      Message: {
-        Subject: {
-          Data: `Termin storniert – ${data.customerName}`,
-          Charset: "UTF-8",
+  await Promise.all([
+    ses.send(
+      new SendEmailCommand({
+        Source: fromEmail,
+        Destination: {
+          ToAddresses: [data.customerEmail],
         },
-        Body: {
-          Html: {
-            Data: companyHtml,
+        Message: {
+          Subject: {
+            Data: `Termin storniert – ${data.companyName}`,
             Charset: "UTF-8",
           },
+          Body: {
+            Html: {
+              Data: customerHtml,
+              Charset: "UTF-8",
+            },
+          },
         },
-      },
-    })
-  );
+      })
+    ),
+
+    ses.send(
+      new SendEmailCommand({
+        Source: fromEmail,
+        Destination: {
+          ToAddresses: [data.companyEmail],
+        },
+        Message: {
+          Subject: {
+            Data: `Termin storniert – ${data.companyName}`,
+            Charset: "UTF-8",
+          },
+          Body: {
+            Html: {
+              Data: companyHtml,
+              Charset: "UTF-8",
+            },
+          },
+        },
+      })
+    ),
+  ]);
 }
+

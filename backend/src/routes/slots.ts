@@ -265,16 +265,18 @@ export default async function slotsRoutes(
             );
           });
 
-        slots.push({
-          startTime:
-            slotStart.toISOString(),
+        // Nur wirklich freie Slots zurückgeben.
+        if (!overlappingAppointment) {
+          slots.push({
+            startTime:
+              slotStart.toISOString(),
 
-          endTime:
-            slotEnd.toISOString(),
+            endTime:
+              slotEnd.toISOString(),
 
-          available:
-            !overlappingAppointment,
-        });
+            available: true,
+          });
+        }
 
         current.setUTCMinutes(
           current.getUTCMinutes() +
@@ -286,3 +288,5 @@ export default async function slotsRoutes(
     return slots;
   });
 }
+
+

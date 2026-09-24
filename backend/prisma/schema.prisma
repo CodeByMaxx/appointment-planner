@@ -50,6 +50,7 @@ model Appointment {
   serviceId     String
   customerName  String
   customerEmail String
+  cancellationCode String @unique
   message       String?
   startTime     DateTime
   endTime       DateTime

@@ -23,6 +23,8 @@ services:
       COMPANY_NAME: "${COMPANY_NAME}"
       COMPANY_EMAIL: "${COMPANY_EMAIL}"
       COMPANY_TIMEZONE: "${COMPANY_TIMEZONE}"
+    volumes:
+      - ~/.aws:/root/.aws:ro
     depends_on:
       - postgres
     ports:

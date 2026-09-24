@@ -1,41 +1,49 @@
-import { FastifyInstance } from "fastify";
 import prisma from "../lib/prisma";
-import { sendAppointmentEmails, sendCancellationEmails } from "../lib/email";
+import { randomInt } from "node:crypto";
+import type { FastifyInstance } from "fastify";
+import {
+  sendAppointmentEmails,
+  sendCancellationEmails,
+} from "../lib/email";
 
-function getLocalParts(date: Date, timeZone: string) {
-  const formatter = new Intl.DateTimeFormat("en-US", {
-    timeZone,
-    weekday: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-  });
-
-  const parts = formatter.formatToParts(date);
-  const values: Record<string, string> = {};
-
-  for (const part of parts) {
-    values[part.type] = part.value;
-  }
-
-  const weekdayMap: Record<string, number> = {
-    Mon: 1,
-    Tue: 2,
-    Wed: 3,
-    Thu: 4,
-    Fri: 5,
-    Sat: 6,
-    Sun: 7,
-  };
-
-  return {
-    weekday: weekdayMap[values.weekday],
-    hour: Number(values.hour),
-    minute: Number(values.minute),
-  };
+function generateCancellationCode(): string {
+  return Array.from({ length: 12 }, () =>
+    randomInt(0, 10).toString()
+  ).join("");
 }
 
-export default async function appointmentsRoutes(app: FastifyInstance) {
+export default async function appointmentRoutes(
+  app: FastifyInstance
+) {
+  // GET /appointments?companyId=...
+  app.get<{
+    Querystring: {
+      companyId?: string;
+    };
+  }>("/appointments", async (request, reply) => {
+    const { companyId } = request.query;
+
+    if (!companyId) {
+      return reply.status(400).send({
+        error: "companyId is required",
+      });
+    }
+
+    const appointments = await prisma.appointment.findMany({
+      where: {
+        companyId,
+      },
+      include: {
+        service: true,
+      },
+      orderBy: {
+        startTime: "asc",
+      },
+    });
+
+    return reply.send(appointments);
+  });
+
   // POST /appointments
   app.post<{
     Body: {
@@ -45,6 +53,7 @@ export default async function appointmentsRoutes(app: FastifyInstance) {
       customerEmail: string;
       message?: string;
       startTime: string;
+      endTime: string;
     };
   }>("/appointments", async (request, reply) => {
     const {
@@ -54,6 +63,7 @@ export default async function appointmentsRoutes(app: FastifyInstance) {
       customerEmail,
       message,
       startTime,
+      endTime,
     } = request.body;
 
     if (
@@ -61,19 +71,24 @@ export default async function appointmentsRoutes(app: FastifyInstance) {
       !serviceId ||
       !customerName ||
       !customerEmail ||
-      !startTime
+      !startTime ||
+      !endTime
     ) {
       return reply.status(400).send({
-        error:
-          "companyId, serviceId, customerName, customerEmail and startTime are required",
+        error: "Missing required fields",
       });
     }
 
     const start = new Date(startTime);
+    const end = new Date(endTime);
 
-    if (Number.isNaN(start.getTime())) {
+    if (
+      Number.isNaN(start.getTime()) ||
+      Number.isNaN(end.getTime()) ||
+      end <= start
+    ) {
       return reply.status(400).send({
-        error: "Invalid startTime",
+        error: "Invalid appointment time",
       });
     }
 
@@ -103,60 +118,125 @@ export default async function appointmentsRoutes(app: FastifyInstance) {
       });
     }
 
-    const end = new Date(start);
-    end.setMinutes(end.getMinutes() + service.durationMinutes);
+    // Check availability for the requested weekday/time.
+    const formatter = new Intl.DateTimeFormat("en-US", {
+      timeZone: company.timezone,
+      weekday: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
 
-    const localStart = getLocalParts(start, company.timezone);
-    const localEnd = getLocalParts(end, company.timezone);
+    const parts = formatter.formatToParts(start);
+
+    const weekdayString = parts.find(
+      (part) => part.type === "weekday"
+    )?.value;
+
+    const hourString = parts.find(
+      (part) => part.type === "hour"
+    )?.value;
+
+    const minuteString = parts.find(
+      (part) => part.type === "minute"
+    )?.value;
+
+    const weekdayMap: Record<string, number> = {
+      Sun: 0,
+      Mon: 1,
+      Tue: 2,
+      Wed: 3,
+      Thu: 4,
+      Fri: 5,
+      Sat: 6,
+    };
+
+    const weekday =
+      weekdayString !== undefined
+        ? weekdayMap[weekdayString]
+        : undefined;
+
+    if (
+      weekday === undefined ||
+      hourString === undefined ||
+      minuteString === undefined
+    ) {
+      return reply.status(400).send({
+        error: "Could not determine appointment weekday/time",
+      });
+    }
 
     const startMinutes =
-      localStart.hour * 60 + localStart.minute;
+      Number(hourString) * 60 + Number(minuteString);
+
+    const endFormatter = new Intl.DateTimeFormat("en-US", {
+      timeZone: company.timezone,
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
+
+    const endParts = endFormatter.formatToParts(end);
+
+    const endHourString = endParts.find(
+      (part) => part.type === "hour"
+    )?.value;
+
+    const endMinuteString = endParts.find(
+      (part) => part.type === "minute"
+    )?.value;
+
+    if (
+      endHourString === undefined ||
+      endMinuteString === undefined
+    ) {
+      return reply.status(400).send({
+        error: "Could not determine appointment end time",
+      });
+    }
 
     const endMinutes =
-      localEnd.hour * 60 + localEnd.minute;
+      Number(endHourString) * 60 +
+      Number(endMinuteString);
 
-    const availabilities = await prisma.availability.findMany({
-      where: {
-        companyId,
-        weekday: localStart.weekday,
-      },
-    });
+    const availability =
+      await prisma.availability.findFirst({
+        where: {
+          companyId,
+          weekday,
+        },
+      });
 
-    if (availabilities.length === 0) {
+    if (!availability) {
       return reply.status(409).send({
-        error: "The company is not available on this day",
+        error: "Appointment time is outside availability",
       });
     }
 
-    const fitsAvailability = availabilities.some((availability) => {
-      const [startHour, startMinute] = availability.startTime
-        .split(":")
-        .map(Number);
+    const [availabilityStartHour, availabilityStartMinute] =
+      availability.startTime.split(":").map(Number);
 
-      const [endHour, endMinute] = availability.endTime
-        .split(":")
-        .map(Number);
+    const [availabilityEndHour, availabilityEndMinute] =
+      availability.endTime.split(":").map(Number);
 
-      const availabilityStart =
-        startHour * 60 + startMinute;
+    const availabilityStartMinutes =
+      availabilityStartHour * 60 +
+      availabilityStartMinute;
 
-      const availabilityEnd =
-        endHour * 60 + endMinute;
+    const availabilityEndMinutes =
+      availabilityEndHour * 60 +
+      availabilityEndMinute;
 
-      return (
-        startMinutes >= availabilityStart &&
-        endMinutes <= availabilityEnd &&
-        localStart.weekday === localEnd.weekday
-      );
-    });
-
-    if (!fitsAvailability) {
+    if (
+      startMinutes < availabilityStartMinutes ||
+      endMinutes > availabilityEndMinutes
+    ) {
       return reply.status(409).send({
-        error:
-          "The selected time is outside the company's availability",
+        error: "Appointment time is outside availability",
       });
     }
 
+    // Check for overlapping confirmed appointments.
     const overlappingAppointment =
       await prisma.appointment.findFirst({
         where: {
@@ -175,128 +255,181 @@ export default async function appointmentsRoutes(app: FastifyInstance) {
 
     if (overlappingAppointment) {
       return reply.status(409).send({
-        error: "The selected time slot is no longer available",
+        error: "Appointment time is already booked",
       });
     }
 
-    const appointment = await prisma.appointment.create({
-      data: {
-        companyId,
-        serviceId,
-        customerName,
-        customerEmail,
-        message,
-        startTime: start,
-        endTime: end,
-        status: "CONFIRMED",
-      },
-    });
+    const appointment =
+      await prisma.appointment.create({
+        data: {
+          companyId,
+          serviceId,
+          customerName,
+          customerEmail,
+          message,
+          startTime: start,
+          endTime: end,
+          status: "CONFIRMED",
+          cancellationCode:
+            generateCancellationCode(),
+        },
+        include: {
+          company: true,
+          service: true,
+        },
+      });
 
-    // E-Mails nach erfolgreicher Buchung senden.
-    // Ein Fehler beim E-Mail-Versand soll die Buchung nicht rückgängig machen.
     try {
       await sendAppointmentEmails({
-        customerName: appointment.customerName,
-        customerEmail: appointment.customerEmail,
-        companyName: company.name,
-        companyEmail: company.email,
-        companyTimezone: company.timezone,
-        serviceName: service.name,
-        startTime: appointment.startTime,
-        endTime: appointment.endTime,
+        customerName:
+          appointment.customerName,
+        customerEmail:
+          appointment.customerEmail,
+        companyName:
+          appointment.company.name,
+        companyEmail:
+          appointment.company.email,
+        companyTimezone:
+          appointment.company.timezone,
+        serviceName:
+          appointment.service.name,
+        startTime:
+          appointment.startTime,
+        endTime:
+          appointment.endTime,
+        cancellationCode:
+          appointment.cancellationCode,
       });
-
-      app.log.info(
-        {
-          appointmentId: appointment.id,
-          customerEmail: appointment.customerEmail,
-          companyEmail: company.email,
-        },
-        "Appointment emails sent"
-      );
     } catch (error) {
-      app.log.error(
-        {
-          appointmentId: appointment.id,
-          error,
-        },
-        "Appointment created, but email notification failed"
+      request.log.error(
+        error,
+        "Failed to send appointment emails"
       );
     }
 
-    return reply.status(201).send(appointment);
+    return reply.status(201).send(
+      appointment
+    );
   });
 
-  // GET /appointments?companyId=1
-  app.get<{
-    Querystring: {
-      companyId: string;
+  // POST /appointments/cancel
+  //
+  // Public customer cancellation using
+  // email address + 12-digit cancellation code.
+  app.post<{
+    Body: {
+      customerEmail: string;
+      cancellationCode: string;
     };
-  }>("/appointments", async (request, reply) => {
-    const { companyId } = request.query;
+  }>("/appointments/cancel", async (request, reply) => {
+    const {
+      customerEmail,
+      cancellationCode,
+    } = request.body;
 
-    if (!companyId) {
+    if (
+      typeof customerEmail !== "string" ||
+      !customerEmail.trim() ||
+      !/^\d{12}$/.test(cancellationCode)
+    ) {
       return reply.status(400).send({
-        error: "companyId is required",
+        error: "Invalid email or cancellation code",
       });
     }
 
-    return prisma.appointment.findMany({
-      where: {
-        companyId,
-      },
-      include: {
-        service: true,
-      },
-      orderBy: {
-        startTime: "asc",
-      },
-    });
-  });
-
-  // GET /appointments/:id
-  app.get<{
-    Params: {
-      id: string;
-    };
-  }>("/appointments/:id", async (request, reply) => {
-    const { id } = request.params;
-
-    const appointment = await prisma.appointment.findUnique({
-      where: {
-        id,
-      },
-      include: {
-        service: true,
-      },
-    });
+    const appointment =
+      await prisma.appointment.findFirst({
+        where: {
+          cancellationCode,
+          customerEmail:
+            customerEmail.trim(),
+        },
+        include: {
+          company: true,
+          service: true,
+        },
+      });
 
     if (!appointment) {
       return reply.status(404).send({
-        error: "Appointment not found",
+        error:
+          "Email address or cancellation code is incorrect",
       });
     }
 
-    return appointment;
+    if (appointment.status === "CANCELLED") {
+      return reply.status(409).send({
+        error: "Appointment is already cancelled",
+      });
+    }
+
+    const cancelledAppointment =
+      await prisma.appointment.update({
+        where: {
+          id: appointment.id,
+        },
+        data: {
+          status: "CANCELLED",
+        },
+      });
+
+    try {
+      await sendCancellationEmails({
+        customerName:
+          cancelledAppointment.customerName,
+        customerEmail:
+          cancelledAppointment.customerEmail,
+        companyName:
+          appointment.company.name,
+        companyEmail:
+          appointment.company.email,
+        companyTimezone:
+          appointment.company.timezone,
+        serviceName:
+          appointment.service.name,
+        startTime:
+          cancelledAppointment.startTime,
+        endTime:
+          cancelledAppointment.endTime,
+      });
+    } catch (error) {
+      request.log.error(
+        error,
+        "Failed to send cancellation emails"
+      );
+    }
+
+    return reply.send({
+      message:
+        "Appointment cancelled successfully",
+      appointment:
+        cancelledAppointment,
+    });
   });
 
   // PATCH /appointments/:id/cancel
+  //
+  // Admin cancellation.
   app.patch<{
     Params: {
       id: string;
     };
-  }>("/appointments/:id/cancel", async (request, reply) => {
+  }>("/appointments/:id/cancel", async (
+    request,
+    reply
+  ) => {
     const { id } = request.params;
 
-    const appointment = await prisma.appointment.findUnique({
-      where: {
-        id,
-      },
-      include: {
-        company: true,
-        service: true,
-      },
-    });
+    const appointment =
+      await prisma.appointment.findUnique({
+        where: {
+          id,
+        },
+        include: {
+          company: true,
+          service: true,
+        },
+      });
 
     if (!appointment) {
       return reply.status(404).send({
@@ -322,34 +455,36 @@ export default async function appointmentsRoutes(app: FastifyInstance) {
 
     try {
       await sendCancellationEmails({
-        customerName: cancelledAppointment.customerName,
-        customerEmail: cancelledAppointment.customerEmail,
-        companyName: appointment.company.name,
-        companyEmail: appointment.company.email,
-        companyTimezone: appointment.company.timezone,
-        serviceName: appointment.service.name,
-        startTime: cancelledAppointment.startTime,
-        endTime: cancelledAppointment.endTime,
+        customerName:
+          cancelledAppointment.customerName,
+        customerEmail:
+          cancelledAppointment.customerEmail,
+        companyName:
+          appointment.company.name,
+        companyEmail:
+          appointment.company.email,
+        companyTimezone:
+          appointment.company.timezone,
+        serviceName:
+          appointment.service.name,
+        startTime:
+          cancelledAppointment.startTime,
+        endTime:
+          cancelledAppointment.endTime,
       });
-
-      app.log.info(
-        {
-          appointmentId: cancelledAppointment.id,
-          customerEmail: cancelledAppointment.customerEmail,
-          companyEmail: appointment.company.email,
-        },
-        "Cancellation emails sent"
-      );
     } catch (error) {
-      app.log.error(
-        {
-          error,
-          appointmentId: cancelledAppointment.id,
-        },
-        "Appointment cancelled, but email notification failed"
+      request.log.error(
+        error,
+        "Failed to send cancellation emails"
       );
     }
 
-    return cancelledAppointment;
+    return reply.send({
+      message:
+        "Appointment cancelled successfully",
+      appointment:
+        cancelledAppointment,
+    });
   });
 }
+
