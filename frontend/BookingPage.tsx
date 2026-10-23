@@ -1,3 +1,4 @@
+import API_URL from "./src/lib/api";
 import { useEffect, useState } from "react";
 
 type Service = {
@@ -38,7 +39,7 @@ export default function BookingPage() {
   const [bookingError, setBookingError] = useState("");
 
   useEffect(() => {
-    fetch("http://localhost:3001/services?companyId=1")
+   fetch(`${API_URL}/services?companyId=1`) 
       .then((response) => response.json())
       .then((data) => setServices(data))
       .catch((error) => {
@@ -62,7 +63,7 @@ export default function BookingPage() {
     setBookingError("");
 
     fetch(
-      `http://localhost:3001/slots?companyId=1&serviceId=${selectedService}&date=${selectedDate}`
+      `${API_URL}/slots?companyId=1&serviceId=${selectedService}&date=${selectedDate}`
     )
       .then((response) => response.json())
       .then((data) => setSlots(data))
@@ -101,7 +102,7 @@ export default function BookingPage() {
 
     try {
       const response = await fetch(
-        "http://localhost:3001/appointments",
+       `${API_URL}/appointments`,
         {
           method: "POST",
           headers: {
@@ -134,7 +135,7 @@ export default function BookingPage() {
       setCustomerEmail("");
 
       const slotsResponse = await fetch(
-        `http://localhost:3001/slots?companyId=1&serviceId=${selectedService}&date=${selectedDate}`
+        `${API_URL}/slots?companyId=1&serviceId=${selectedService}&date=${selectedDate}`
       );
 
       const updatedSlots = await slotsResponse.json();

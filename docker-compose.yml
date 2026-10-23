@@ -10,10 +10,9 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
-  api:
+  api1:
     build:
       context: ./backend
-    container_name: appointment-planner-api
     restart: unless-stopped
     environment:
       DATABASE_URL: "${DATABASE_URL}"
@@ -27,8 +26,37 @@ services:
       - ~/.aws:/root/.aws:ro
     depends_on:
       - postgres
-    ports:
-      - "3001:3001"
+    expose:
+      - "3001"
+
+  api2:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: "${DATABASE_URL}"
+      AWS_REGION: "${AWS_REGION}"
+      SES_FROM_EMAIL: "${SES_FROM_EMAIL}"
+      COMPANY_ID: "${COMPANY_ID}"
+      COMPANY_NAME: "${COMPANY_NAME}"
+      COMPANY_EMAIL: "${COMPANY_EMAIL}"
+      COMPANY_TIMEZONE: "${COMPANY_TIMEZONE}"
+    volumes:
+      - ~/.aws:/root/.aws:ro
+    depends_on:
+      - postgres
+    expose:
+      - "3001"
+
+  api-lb:
+    build:
+      context: ./load-balancer
+    restart: unless-stopped
+    depends_on:
+      - api1
+      - api2
+    expose:
+      - "80"
 
   frontend:
     build:
@@ -40,9 +68,10 @@ services:
     container_name: appointment-planner-frontend
     restart: unless-stopped
     depends_on:
-      - api
+      - api-lb
     ports:
       - "80:80"
       - "8080:80"
+
 volumes:
   postgres_data:
