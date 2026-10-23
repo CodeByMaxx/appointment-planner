@@ -1,4 +1,6 @@
 import prisma from "../lib/prisma";
+import { createCalendarEvent, deleteCalendarEvent, getCalendarEvents } from "../lib/outlook/graph";
+import { isOutlookConfigured } from "../lib/outlook/config";
 import { randomInt } from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import {
@@ -259,6 +261,39 @@ export default async function appointmentRoutes(
       });
     }
 
+    if (isOutlookConfigured()) {
+      try {
+        const outlookEvents = await getCalendarEvents(start, end);
+        const outlookConflict = outlookEvents.some((event) => {
+          if (event.isCancelled || event.showAs === "free") return false;
+
+          const eventStart = new Date(event.start.dateTime);
+          const eventEnd = new Date(event.end.dateTime);
+
+          return (
+            !Number.isNaN(eventStart.getTime()) &&
+            !Number.isNaN(eventEnd.getTime()) &&
+            start < eventEnd &&
+            end > eventStart
+          );
+        });
+
+        if (outlookConflict) {
+          return reply.status(409).send({
+            error: "Appointment time conflicts with the Outlook calendar",
+          });
+        }
+      } catch (error) {
+        request.log.error(
+          { err: error },
+          "Outlook calendar conflict check failed"
+        );
+        return reply.status(503).send({
+          error: "Booking temporarily unavailable because the Outlook calendar could not be checked",
+        });
+      }
+    }
+
     const appointment =
       await prisma.appointment.create({
         data: {
@@ -279,26 +314,77 @@ export default async function appointmentRoutes(
         },
       });
 
+    let savedAppointment = appointment;
+
+    if (isOutlookConfigured()) {
+      let outlookEventId: string | undefined;
+
+      try {
+        const outlookEvent = await createCalendarEvent({
+          subject: `${appointment.service.name} – ${appointment.customerName}`,
+          startUtc: appointment.startTime,
+          endUtc: appointment.endTime,
+          body:
+            `Service: ${appointment.service.name}\n` +
+            `Kunde: ${appointment.customerName}\n` +
+            `E-Mail: ${appointment.customerEmail}`,
+        });
+
+        outlookEventId = outlookEvent.id;
+
+        savedAppointment = await prisma.appointment.update({
+          where: { id: appointment.id },
+          data: { outlookEventId },
+          include: {
+            company: true,
+            service: true,
+          },
+        });
+      } catch (error) {
+        request.log.error(
+          { err: error },
+          "Outlook event creation or appointment update failed"
+        );
+
+        if (outlookEventId) {
+          try {
+            await deleteCalendarEvent(outlookEventId);
+          } catch (cleanupError) {
+            request.log.error(
+              { err: cleanupError },
+              "Failed to clean up Outlook event after booking failure"
+            );
+          }
+        }
+
+        try {
+          await prisma.appointment.delete({
+            where: { id: appointment.id },
+          });
+        } catch (cleanupError) {
+          request.log.error(
+            { err: cleanupError },
+            "Failed to clean up database appointment after booking failure"
+          );
+        }
+
+        return reply.status(503).send({
+          error: "Booking could not be synchronized with Outlook. Please try again.",
+        });
+      }
+    }
+
     try {
       await sendAppointmentEmails({
-        customerName:
-          appointment.customerName,
-        customerEmail:
-          appointment.customerEmail,
-        companyName:
-          appointment.company.name,
-        companyEmail:
-          appointment.company.email,
-        companyTimezone:
-          appointment.company.timezone,
-        serviceName:
-          appointment.service.name,
-        startTime:
-          appointment.startTime,
-        endTime:
-          appointment.endTime,
-        cancellationCode:
-          appointment.cancellationCode,
+        customerName: savedAppointment.customerName,
+        customerEmail: savedAppointment.customerEmail,
+        companyName: savedAppointment.company.name,
+        companyEmail: savedAppointment.company.email,
+        companyTimezone: savedAppointment.company.timezone,
+        serviceName: savedAppointment.service.name,
+        startTime: savedAppointment.startTime,
+        endTime: savedAppointment.endTime,
+        cancellationCode: savedAppointment.cancellationCode,
       });
     } catch (error) {
       request.log.error(
@@ -307,9 +393,7 @@ export default async function appointmentRoutes(
       );
     }
 
-    return reply.status(201).send(
-      appointment
-    );
+    return reply.status(201).send(savedAppointment);
   });
 
   // POST /appointments/cancel
@@ -361,6 +445,28 @@ export default async function appointmentRoutes(
       return reply.status(409).send({
         error: "Appointment is already cancelled",
       });
+    }
+
+    if (appointment.outlookEventId) {
+      if (!isOutlookConfigured()) {
+        return reply.status(503).send({
+          error: "Outlook is not configured; the appointment could not be fully cancelled",
+        });
+      }
+
+      try {
+        await deleteCalendarEvent(appointment.outlookEventId);
+      } catch (error) {
+        if (!(error instanceof Error && /HTTP 404/.test(error.message))) {
+          request.log.error(
+            { err: error },
+            "Failed to delete Outlook event during cancellation"
+          );
+          return reply.status(503).send({
+            error: "The Outlook event could not be cancelled. Please try again.",
+          });
+        }
+      }
     }
 
     const cancelledAppointment =
@@ -441,6 +547,28 @@ export default async function appointmentRoutes(
       return reply.status(409).send({
         error: "Appointment is already cancelled",
       });
+    }
+
+    if (appointment.outlookEventId) {
+      if (!isOutlookConfigured()) {
+        return reply.status(503).send({
+          error: "Outlook is not configured; the appointment could not be fully cancelled",
+        });
+      }
+
+      try {
+        await deleteCalendarEvent(appointment.outlookEventId);
+      } catch (error) {
+        if (!(error instanceof Error && /HTTP 404/.test(error.message))) {
+          request.log.error(
+            { err: error },
+            "Failed to delete Outlook event during cancellation"
+          );
+          return reply.status(503).send({
+            error: "The Outlook event could not be cancelled. Please try again.",
+          });
+        }
+      }
     }
 
     const cancelledAppointment =

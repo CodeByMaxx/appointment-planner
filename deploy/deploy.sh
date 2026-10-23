@@ -543,40 +543,76 @@ chmod 600 '$REMOTE_PROJECT/.env'"
 echo "Environment created."
 
 # ------------------------------------------------------------
-# 12. Start Docker stack
+# 12. Build images and start database
 # ------------------------------------------------------------
 
 echo
-echo "==> Building and starting Docker stack..."
+echo "==> Building application images..."
 
 ssh_cmd \
-    "cd '$REMOTE_PROJECT' && sudo docker compose up -d --build"
+    "cd '$REMOTE_PROJECT' && sudo docker compose build"
+
+echo "Images built."
+
+echo
+echo "==> Starting database..."
+
+ssh_cmd \
+    "cd '$REMOTE_PROJECT' && sudo docker compose up -d postgres"
+
+echo "Database container started."
+
+# Wait until PostgreSQL accepts connections.
+echo
+echo "==> Waiting for PostgreSQL..."
+
+DB_READY="no"
+
+for attempt in $(seq 1 30); do
+    if ssh_cmd \
+        "cd '$REMOTE_PROJECT' && sudo docker compose exec -T postgres pg_isready -U '$POSTGRES_USER' -d '$POSTGRES_DB'" \
+        >/dev/null 2>&1; then
+        DB_READY="yes"
+        break
+    fi
+
+    echo "  PostgreSQL not ready yet ($attempt/30)..."
+    sleep 2
+done
+
+if [[ "$DB_READY" != "yes" ]]; then
+    echo "ERROR: PostgreSQL did not become ready. Aborting deployment."
+    exit 1
+fi
+
+echo "PostgreSQL is ready."
+
+# ------------------------------------------------------------
+# 13. Run Prisma migrations before starting APIs
+# ------------------------------------------------------------
+
+echo
+echo "==> Running Prisma migrations before API startup..."
+
+if ! ssh_cmd \
+    "cd '$REMOTE_PROJECT' && sudo docker compose run --rm --no-deps api1 npx prisma migrate deploy"; then
+    echo "ERROR: Prisma migrations failed. Aborting deployment."
+    exit 1
+fi
+
+echo "Prisma migrations completed."
+
+# ------------------------------------------------------------
+# 14. Start the application stack
+# ------------------------------------------------------------
+
+echo
+echo "==> Starting Docker stack..."
+
+ssh_cmd \
+    "cd '$REMOTE_PROJECT' && sudo docker compose up -d"
 
 echo "Docker stack started."
-
-# ------------------------------------------------------------
-# 13. Run Prisma migrations
-# ------------------------------------------------------------
-
-echo
-echo "==> Running Prisma migrations..."
-
-ssh_cmd \
-    "cd '$REMOTE_PROJECT' && sudo docker compose exec -T api npx prisma migrate deploy"
-
-echo "Migrations completed."
-
-# ------------------------------------------------------------
-# 14. Seed database
-# ------------------------------------------------------------
-
-echo
-echo "==> Seeding database..."
-
-ssh_cmd \
-    "cd '$REMOTE_PROJECT' && sudo docker compose exec -T api npx tsx prisma/seed.ts"
-
-echo "Database seeded."
 
 # ------------------------------------------------------------
 # 15. Verify company

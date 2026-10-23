@@ -1,5 +1,11 @@
 import { FastifyInstance } from "fastify";
 import prisma from "../lib/prisma";
+import {
+  getCalendarEvents,
+} from "../lib/outlook/graph";
+import {
+  isOutlookConfigured,
+} from "../lib/outlook/config";
 
 function getWeekday(
   date: string,
@@ -218,6 +224,30 @@ export default async function slotsRoutes(
         },
       });
 
+    // Outlook-Termine zusätzlich zu lokalen Buchungen berücksichtigen.
+    let outlookEvents: Awaited<
+      ReturnType<typeof getCalendarEvents>
+    > = [];
+
+    if (isOutlookConfigured()) {
+      try {
+        outlookEvents = await getCalendarEvents(
+          dayStart,
+          nextDay
+        );
+      } catch (error) {
+        request.log.error(
+          { err: error },
+          "Outlook-Kalender konnte nicht geprüft werden"
+        );
+
+        return reply.status(503).send({
+          error:
+            "Availability temporarily unavailable because the Outlook calendar could not be checked.",
+        });
+      }
+    }
+
     const slots: Array<{
       startTime: string;
       endTime: string;
@@ -262,6 +292,28 @@ export default async function slotsRoutes(
             return (
               slotStart < appointment.endTime &&
               slotEnd > appointment.startTime
+            );
+          }) ||
+          outlookEvents.some((event) => {
+            if (
+              event.isCancelled ||
+              event.showAs === "free"
+            ) {
+              return false;
+            }
+
+            const eventStart = new Date(
+              event.start.dateTime
+            );
+            const eventEnd = new Date(
+              event.end.dateTime
+            );
+
+            return (
+              !Number.isNaN(eventStart.getTime()) &&
+              !Number.isNaN(eventEnd.getTime()) &&
+              slotStart < eventEnd &&
+              slotEnd > eventStart
             );
           });
 

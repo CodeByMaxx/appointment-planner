@@ -52,6 +52,7 @@ model Appointment {
   customerEmail String
   cancellationCode String @unique
   message       String?
+  outlookEventId String?
   startTime     DateTime
   endTime       DateTime
   status        String   @default("CONFIRMED")
